@@ -6,7 +6,6 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
 public record AccountUpsertRequest(
-        @NotNull Long userId,
         @NotBlank String name,
         @NotNull AccountType type,
         String institution,
