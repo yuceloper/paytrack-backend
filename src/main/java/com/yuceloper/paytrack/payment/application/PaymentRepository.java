@@ -9,5 +9,5 @@ import java.util.Optional;
 public interface PaymentRepository {
     Payment save(Payment payment);
     Optional<Payment> findById(Long id);
-    List<Payment> findDueBetween(LocalDate start, LocalDate end);
+    List<Payment> findDueBetween(Long userId, LocalDate start, LocalDate end);
 }
