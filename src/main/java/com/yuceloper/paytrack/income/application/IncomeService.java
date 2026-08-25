@@ -1,6 +1,7 @@
 package com.yuceloper.paytrack.income.application;
 
 import com.yuceloper.paytrack.account.application.AccountTransactionService;
+import com.yuceloper.paytrack.income.api.dto.IncomeOccurrenceUpdateRequest;
 import com.yuceloper.paytrack.income.api.dto.IncomeResponses;
 import com.yuceloper.paytrack.income.api.dto.IncomeSourceRequest;
 import com.yuceloper.paytrack.income.domain.*;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -45,9 +47,87 @@ public class IncomeService {
     }
 
     @Transactional
+    public IncomeResponses.Occurrence updateOccurrence(
+            Long occurrenceId,
+            IncomeOccurrenceUpdateRequest request,
+            IncomeSeriesScope scope
+    ) {
+        IncomeOccurrence current = getOccurrence(occurrenceId);
+        if (current.isReceived()) {
+            throw new IllegalArgumentException("Received income occurrences cannot be edited");
+        }
+
+        IncomeSource source = getSource(current.getIncomeSourceId());
+        validateOccurrenceUpdate(request);
+
+        if (scope == IncomeSeriesScope.THIS) {
+            applyOccurrence(current, request.name(), request.amount(), request.expectedDate());
+            return toOccurrence(occurrenceRepository.save(current));
+        }
+
+        applySource(source, request);
+        List<IncomeOccurrence> targets = occurrenceRepository.findBySourceId(source.getId()).stream()
+                .filter(item -> !item.isReceived())
+                .filter(item -> scope == IncomeSeriesScope.ALL || !item.getExpectedDate().isBefore(current.getExpectedDate()))
+                .sorted(Comparator.comparing(IncomeOccurrence::getExpectedDate))
+                .toList();
+
+        LocalDate date = request.expectedDate();
+        for (IncomeOccurrence target : targets) {
+            applyOccurrence(target, request.name(), request.amount(), date);
+            if (source.getFrequency() != IncomeFrequency.ONE_TIME) {
+                date = nextDate(source, date);
+            }
+        }
+        occurrenceRepository.saveAll(targets);
+
+        source.setNextIncomeDate(request.expectedDate());
+        source.setActive(true);
+        if (source.getRecurrenceEndDate() != null && request.expectedDate().isAfter(source.getRecurrenceEndDate())) {
+            source.setActive(false);
+        }
+        sourceRepository.save(source);
+
+        return toOccurrence(current);
+    }
+
+    @Transactional
+    public void deleteOccurrence(Long occurrenceId, IncomeSeriesScope scope) {
+        IncomeOccurrence current = getOccurrence(occurrenceId);
+        if (current.isReceived()) {
+            throw new IllegalArgumentException("Received income occurrences cannot be deleted");
+        }
+
+        IncomeSource source = getSource(current.getIncomeSourceId());
+        if (scope == IncomeSeriesScope.THIS) {
+            occurrenceRepository.delete(current);
+            if (source.getFrequency() == IncomeFrequency.ONE_TIME) {
+                source.setActive(false);
+            } else {
+                LocalDate next = nextDate(source, current.getExpectedDate());
+                if (source.getRecurrenceEndDate() != null && next.isAfter(source.getRecurrenceEndDate())) {
+                    source.setActive(false);
+                } else {
+                    source.setNextIncomeDate(next);
+                    ensureOccurrence(source, next);
+                }
+            }
+            sourceRepository.save(source);
+            return;
+        }
+
+        List<IncomeOccurrence> targets = occurrenceRepository.findBySourceId(source.getId()).stream()
+                .filter(item -> !item.isReceived())
+                .filter(item -> scope == IncomeSeriesScope.ALL || !item.getExpectedDate().isBefore(current.getExpectedDate()))
+                .toList();
+        occurrenceRepository.deleteAll(targets);
+        source.setActive(false);
+        sourceRepository.save(source);
+    }
+
+    @Transactional
     public IncomeResponses.Occurrence markReceived(Long occurrenceId, Long accountId) {
-        IncomeOccurrence occurrence = occurrenceRepository.findById(occurrenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Income occurrence not found: " + occurrenceId));
+        IncomeOccurrence occurrence = getOccurrence(occurrenceId);
         boolean wasReceived = occurrence.isReceived();
         if (!wasReceived) occurrence.markReceived();
         occurrenceRepository.save(occurrence);
@@ -59,8 +139,7 @@ public class IncomeService {
             );
         }
 
-        IncomeSource source = sourceRepository.findById(occurrence.getIncomeSourceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Income source not found: " + occurrence.getIncomeSourceId()));
+        IncomeSource source = getSource(occurrence.getIncomeSourceId());
         if (source.isActive() && source.getFrequency() != IncomeFrequency.ONE_TIME) {
             LocalDate nextDate = nextDate(source, occurrence.getExpectedDate());
             if (source.getRecurrenceEndDate() != null && nextDate.isAfter(source.getRecurrenceEndDate())) {
@@ -77,11 +156,41 @@ public class IncomeService {
 
     @Transactional
     public IncomeResponses.Occurrence markPending(Long occurrenceId) {
-        IncomeOccurrence occurrence = occurrenceRepository.findById(occurrenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Income occurrence not found: " + occurrenceId));
+        IncomeOccurrence occurrence = getOccurrence(occurrenceId);
         if (occurrence.isReceived()) accountTransactionService.reverseIncome("INCOME_OCCURRENCE", occurrence.getId());
         occurrence.markPending();
         return toOccurrence(occurrenceRepository.save(occurrence));
+    }
+
+    private IncomeOccurrence getOccurrence(Long id) {
+        return occurrenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Income occurrence not found: " + id));
+    }
+
+    private IncomeSource getSource(Long id) {
+        return sourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Income source not found: " + id));
+    }
+
+    private void applyOccurrence(IncomeOccurrence occurrence, String name, java.math.BigDecimal amount, LocalDate expectedDate) {
+        occurrence.setName(name);
+        occurrence.setAmount(amount);
+        occurrence.setExpectedDate(expectedDate);
+    }
+
+    private void applySource(IncomeSource source, IncomeOccurrenceUpdateRequest request) {
+        source.setName(request.name());
+        source.setAmount(request.amount());
+        source.setFrequency(request.frequency());
+        source.setRecurrenceDay(
+                request.frequency() == IncomeFrequency.MONTHLY || request.frequency() == IncomeFrequency.CUSTOM_MONTHS
+                        ? (request.recurrenceDay() != null ? request.recurrenceDay() : request.expectedDate().getDayOfMonth())
+                        : null
+        );
+        source.setRecurrenceInterval(request.frequency() == IncomeFrequency.ONE_TIME
+                ? null
+                : (request.recurrenceInterval() != null ? request.recurrenceInterval() : 1));
+        source.setRecurrenceEndDate(request.recurrenceEndDate());
     }
 
     private void ensureOccurrence(IncomeSource source, LocalDate date) {
@@ -130,6 +239,16 @@ public class IncomeService {
     private void validateRequest(IncomeSourceRequest request) {
         if (request.recurrenceEndDate() != null && request.recurrenceEndDate().isBefore(request.nextIncomeDate())) {
             throw new IllegalArgumentException("recurrenceEndDate must be on or after nextIncomeDate");
+        }
+        if (request.frequency() != IncomeFrequency.ONE_TIME &&
+                request.recurrenceInterval() != null && request.recurrenceInterval() < 1) {
+            throw new IllegalArgumentException("recurrenceInterval must be at least 1");
+        }
+    }
+
+    private void validateOccurrenceUpdate(IncomeOccurrenceUpdateRequest request) {
+        if (request.recurrenceEndDate() != null && request.recurrenceEndDate().isBefore(request.expectedDate())) {
+            throw new IllegalArgumentException("recurrenceEndDate must be on or after expectedDate");
         }
         if (request.frequency() != IncomeFrequency.ONE_TIME &&
                 request.recurrenceInterval() != null && request.recurrenceInterval() < 1) {
