@@ -1,5 +1,6 @@
 package com.yuceloper.paytrack.payment.api;
 
+import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.payment.api.dto.PaymentResponse;
 import com.yuceloper.paytrack.payment.api.dto.PaymentUpsertRequest;
 import com.yuceloper.paytrack.payment.application.PaymentService;
@@ -22,25 +23,23 @@ public class PaymentController {
 
     @GetMapping
     public ApiResponse<List<PaymentResponse>> getRange(
-            @RequestParam Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ApiResponse.success(service.getRange(userId, from, to));
+        return ApiResponse.success(service.getRange(AuthenticatedUser.id(), from, to));
     }
 
     @GetMapping("/upcoming")
     public ApiResponse<List<PaymentResponse>> getUpcoming(
-            @RequestParam Long userId,
             @RequestParam(defaultValue = "7") int days
     ) {
         int safeDays = Math.max(1, Math.min(days, 365));
-        return ApiResponse.success(service.getUpcoming(userId, safeDays));
+        return ApiResponse.success(service.getUpcoming(AuthenticatedUser.id(), safeDays));
     }
 
     @PostMapping
     public ApiResponse<PaymentResponse> create(@Valid @RequestBody PaymentUpsertRequest request) {
-        return ApiResponse.success(service.create(request));
+        return ApiResponse.success(service.create(AuthenticatedUser.id(), request));
     }
 
     @PutMapping("/{id}")
@@ -49,7 +48,7 @@ public class PaymentController {
             @RequestParam(defaultValue = "THIS") PaymentSeriesScope scope,
             @Valid @RequestBody PaymentUpsertRequest request
     ) {
-        return ApiResponse.success(service.update(id, request, scope));
+        return ApiResponse.success(service.update(AuthenticatedUser.id(), id, request, scope));
     }
 
     @PatchMapping("/{id}/paid")
@@ -57,12 +56,12 @@ public class PaymentController {
             @PathVariable Long id,
             @RequestParam(required = false) Long accountId
     ) {
-        return ApiResponse.success(service.markPaid(id, accountId));
+        return ApiResponse.success(service.markPaid(AuthenticatedUser.id(), id, accountId));
     }
 
     @PatchMapping("/{id}/pending")
     public ApiResponse<PaymentResponse> markPending(@PathVariable Long id) {
-        return ApiResponse.success(service.markPending(id));
+        return ApiResponse.success(service.markPending(AuthenticatedUser.id(), id));
     }
 
     @DeleteMapping("/{id}")
@@ -70,7 +69,7 @@ public class PaymentController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "THIS") PaymentSeriesScope scope
     ) {
-        service.delete(id, scope);
+        service.delete(AuthenticatedUser.id(), id, scope);
         return ApiResponse.success(null);
     }
 }
