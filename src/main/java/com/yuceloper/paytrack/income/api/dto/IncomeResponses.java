@@ -19,6 +19,8 @@ public class IncomeResponses {
             String currency,
             IncomeFrequency frequency,
             Integer recurrenceDay,
+            Integer recurrenceInterval,
+            LocalDate recurrenceEndDate,
             LocalDate nextIncomeDate,
             boolean active,
             String note
