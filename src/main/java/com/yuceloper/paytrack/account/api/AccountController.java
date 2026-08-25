@@ -3,6 +3,7 @@ package com.yuceloper.paytrack.account.api;
 import com.yuceloper.paytrack.account.api.dto.AccountResponse;
 import com.yuceloper.paytrack.account.api.dto.AccountUpsertRequest;
 import com.yuceloper.paytrack.account.application.AccountService;
+import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,24 +20,24 @@ public class AccountController {
     private final AccountService service;
 
     @GetMapping
-    public ApiResponse<List<AccountResponse>> getAll(@RequestParam Long userId) {
-        return ApiResponse.success(service.getAll(userId));
+    public ApiResponse<List<AccountResponse>> getAll() {
+        return ApiResponse.success(service.getAll(AuthenticatedUser.id()));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AccountResponse> create(@Valid @RequestBody AccountUpsertRequest request) {
-        return ApiResponse.success(service.create(request));
+        return ApiResponse.success(service.create(AuthenticatedUser.id(), request));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<AccountResponse> update(@PathVariable Long id, @Valid @RequestBody AccountUpsertRequest request) {
-        return ApiResponse.success(service.update(id, request));
+        return ApiResponse.success(service.update(AuthenticatedUser.id(), id, request));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
-        service.delete(id);
+        service.delete(AuthenticatedUser.id(), id);
     }
 }
