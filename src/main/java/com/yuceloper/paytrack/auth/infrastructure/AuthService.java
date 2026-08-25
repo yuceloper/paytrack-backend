@@ -23,6 +23,7 @@ public class AuthService {
     private final AuthUserJpaRepository userRepository;
     private final RefreshTokenJpaRepository refreshTokenRepository;
     private final JwtService jwtService;
+    private final GoogleIdentityVerifier googleIdentityVerifier;
 
     @Value("${paytrack.auth.refresh-token-days:180}")
     private long refreshTokenDays;
@@ -60,6 +61,32 @@ public class AuthService {
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);
         return issueSession(user);
+    }
+
+    @Transactional
+    public AuthDtos.SessionResponse linkGoogle(Long currentUserId, String idToken) {
+        User current = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        GoogleIdentityVerifier.GoogleIdentity identity = googleIdentityVerifier.verify(idToken);
+
+        var linkedBySubject = userRepository.findByAuthProviderAndProviderSubject(AuthProvider.GOOGLE, identity.subject());
+        if (linkedBySubject.isPresent() && !linkedBySubject.get().getId().equals(current.getId())) {
+            throw new IllegalArgumentException("This Google account is already linked to another PayTrack account");
+        }
+
+        var linkedByEmail = userRepository.findByEmailIgnoreCase(identity.email());
+        if (linkedByEmail.isPresent() && !linkedByEmail.get().getId().equals(current.getId())) {
+            throw new IllegalArgumentException("This email is already used by another PayTrack account");
+        }
+
+        current.setAuthProvider(AuthProvider.GOOGLE);
+        current.setProviderSubject(identity.subject());
+        current.setEmail(identity.email());
+        if (identity.name() != null && !identity.name().isBlank()) {
+            current.setName(identity.name());
+        }
+        userRepository.save(current);
+        return issueSession(current);
     }
 
     private AuthDtos.SessionResponse issueSession(User user) {
