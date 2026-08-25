@@ -20,11 +20,19 @@ public class Payment {
     private Long id;
 
     @Column(nullable = false)
+    private Long userId;
+
+    @Column(nullable = false)
     private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentType type;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentSourceType sourceType;
+
+    private Long sourceId;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
