@@ -5,6 +5,7 @@ import com.yuceloper.paytrack.account.application.AccountTransactionService;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -27,9 +28,18 @@ public class AccountTransactionController {
     }
 
     @PostMapping("/transfer")
+    @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AccountTransactionDtos.Response> transfer(
             @Valid @RequestBody AccountTransactionDtos.TransferRequest request
     ) {
         return ApiResponse.success(service.transfer(request));
+    }
+
+    @PostMapping("/manual")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<AccountTransactionDtos.Response> manual(
+            @Valid @RequestBody AccountTransactionDtos.ManualRequest request
+    ) {
+        return ApiResponse.success(service.manual(request));
     }
 }
