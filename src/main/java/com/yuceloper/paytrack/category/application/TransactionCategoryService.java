@@ -16,6 +16,7 @@ public class TransactionCategoryService {
 
     private final TransactionCategoryRepository repository;
 
+    @Transactional
     public List<TransactionCategoryDtos.Response> getAll(Long userId) {
         ensureDefaults(userId);
         return repository.findAllByUserId(userId).stream()
@@ -42,8 +43,7 @@ public class TransactionCategoryService {
         return toResponse(saved);
     }
 
-    @Transactional
-    public void ensureDefaults(Long userId) {
+    private void ensureDefaults(Long userId) {
         createDefault(userId, "Market", TransactionCategoryType.EXPENSE, "shopping_cart");
         createDefault(userId, "Yemek", TransactionCategoryType.EXPENSE, "restaurant");
         createDefault(userId, "Ulaşım", TransactionCategoryType.EXPENSE, "directions_car");
