@@ -39,9 +39,9 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse create(PaymentUpsertRequest request) {
+    public PaymentResponse create(Long userId, PaymentUpsertRequest request) {
         Payment payment = Payment.builder()
-                .userId(request.userId()).name(request.name()).type(request.type())
+                .userId(userId).name(request.name()).type(request.type())
                 .sourceType(request.sourceType()).sourceId(request.sourceId()).amount(request.amount())
                 .dueDate(request.dueDate()).recurring(request.recurring())
                 .seriesId(request.recurring() ? UUID.randomUUID().toString() : null)
@@ -54,8 +54,8 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse update(Long id, PaymentUpsertRequest request, PaymentSeriesScope scope) {
-        Payment current = getEntity(id);
+    public PaymentResponse update(Long userId, Long id, PaymentUpsertRequest request, PaymentSeriesScope scope) {
+        Payment current = getEntity(userId, id);
         PaymentSeriesScope safeScope = scope != null ? scope : PaymentSeriesScope.THIS;
 
         if (safeScope == PaymentSeriesScope.THIS) {
@@ -67,7 +67,7 @@ public class PaymentService {
             return toResponse(repository.save(current));
         }
 
-        List<Payment> targets = seriesTargets(current, safeScope);
+        List<Payment> targets = seriesTargets(userId, current, safeScope);
         for (Payment target : targets) {
             boolean isCurrent = target.getId().equals(current.getId());
             applyRequest(target, request, isCurrent);
@@ -78,14 +78,14 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse markPaid(Long id, Long accountId) {
-        Payment payment = getEntity(id);
+    public PaymentResponse markPaid(Long userId, Long id, Long accountId) {
+        Payment payment = getEntity(userId, id);
         boolean wasPaid = payment.isPaid();
         payment.markPaid();
         Payment saved = repository.save(payment);
         if (!wasPaid && accountId != null) {
             accountTransactionService.recordExpense(
-                    accountId, saved.getUserId(), saved.getAmount(), saved.getName(),
+                    accountId, userId, saved.getAmount(), saved.getName(),
                     "PAYMENT", saved.getId(), LocalDate.now()
             );
         }
@@ -94,16 +94,16 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse markPending(Long id) {
-        Payment payment = getEntity(id);
+    public PaymentResponse markPending(Long userId, Long id) {
+        Payment payment = getEntity(userId, id);
         if (payment.isPaid()) accountTransactionService.reverseExpense("PAYMENT", payment.getId());
         payment.markPending();
         return toResponse(repository.save(payment));
     }
 
     @Transactional
-    public void delete(Long id, PaymentSeriesScope scope) {
-        Payment current = getEntity(id);
+    public void delete(Long userId, Long id, PaymentSeriesScope scope) {
+        Payment current = getEntity(userId, id);
         PaymentSeriesScope safeScope = scope != null ? scope : PaymentSeriesScope.THIS;
 
         if (safeScope == PaymentSeriesScope.THIS) {
@@ -114,16 +114,17 @@ public class PaymentService {
             return;
         }
 
-        List<Payment> targets = seriesTargets(current, safeScope);
+        List<Payment> targets = seriesTargets(userId, current, safeScope);
         repository.deleteAll(targets);
     }
 
-    private List<Payment> seriesTargets(Payment current, PaymentSeriesScope scope) {
+    private List<Payment> seriesTargets(Long userId, Payment current, PaymentSeriesScope scope) {
         if (current.getSeriesId() == null || current.getSeriesId().isBlank()) {
             return List.of(current);
         }
 
         return repository.findBySeriesId(current.getSeriesId()).stream()
+                .filter(item -> userId.equals(item.getUserId()))
                 .filter(item -> switch (scope) {
                     case THIS -> item.getId().equals(current.getId());
                     case THIS_AND_FUTURE -> !item.getDueDate().isBefore(current.getDueDate());
@@ -134,7 +135,6 @@ public class PaymentService {
     }
 
     private void applyRequest(Payment payment, PaymentUpsertRequest request, boolean updateDueDate) {
-        payment.setUserId(request.userId());
         payment.setName(request.name());
         payment.setType(request.type());
         payment.setSourceType(request.sourceType());
@@ -154,8 +154,13 @@ public class PaymentService {
         }
     }
 
-    private Payment getEntity(Long id) {
-        return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + id));
+    private Payment getEntity(Long userId, Long id) {
+        Payment payment = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + id));
+        if (!userId.equals(payment.getUserId())) {
+            throw new ResourceNotFoundException("Payment not found: " + id);
+        }
+        return payment;
     }
 
     private PaymentRecurrenceFrequency resolveFrequency(PaymentUpsertRequest request) {
