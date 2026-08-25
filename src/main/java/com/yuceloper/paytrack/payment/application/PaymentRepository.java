@@ -11,5 +11,6 @@ public interface PaymentRepository {
     Optional<Payment> findById(Long id);
     List<Payment> findDueBetween(Long userId, LocalDate start, LocalDate end);
     List<Payment> findOverdue(Long userId, LocalDate today);
+    boolean existsByUserIdAndNameAndDueDate(Long userId, String name, LocalDate dueDate);
     void deleteById(Long id);
 }
