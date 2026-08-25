@@ -17,6 +17,7 @@ import java.util.List;
 public class PaymentService {
 
     private final PaymentRepository repository;
+    private final PaymentRecurrenceService recurrenceService;
 
     public List<PaymentResponse> getUpcoming(Long userId, int days) {
         LocalDate start = LocalDate.now();
@@ -76,7 +77,9 @@ public class PaymentService {
     public PaymentResponse markPaid(Long id) {
         Payment payment = getEntity(id);
         payment.markPaid();
-        return toResponse(repository.save(payment));
+        Payment saved = repository.save(payment);
+        recurrenceService.createNextOccurrenceIfNeeded(saved);
+        return toResponse(saved);
     }
 
     @Transactional
