@@ -1,5 +1,6 @@
 package com.yuceloper.paytrack.payment.api.dto;
 
+import com.yuceloper.paytrack.payment.domain.PaymentRecurrenceFrequency;
 import com.yuceloper.paytrack.payment.domain.PaymentSourceType;
 import com.yuceloper.paytrack.payment.domain.PaymentType;
 import jakarta.validation.constraints.DecimalMin;
@@ -20,6 +21,9 @@ public record PaymentUpsertRequest(
         @NotNull LocalDate dueDate,
         boolean recurring,
         Integer recurrenceDay,
+        PaymentRecurrenceFrequency recurrenceFrequency,
+        @Positive Integer recurrenceInterval,
+        LocalDate recurrenceEndDate,
         String institution,
         String note
 ) {}
