@@ -1,6 +1,7 @@
 package com.yuceloper.paytrack.auth.api;
 
 import com.yuceloper.paytrack.auth.infrastructure.AuthService;
+import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,5 +20,10 @@ public class AuthController {
     @PostMapping("/refresh")
     public ApiResponse<AuthDtos.SessionResponse> refresh(@RequestBody AuthDtos.RefreshRequest request) {
         return ApiResponse.success(authService.refresh(request.refreshToken()));
+    }
+
+    @PostMapping("/google/link")
+    public ApiResponse<AuthDtos.SessionResponse> linkGoogle(@RequestBody AuthDtos.GoogleLinkRequest request) {
+        return ApiResponse.success(authService.linkGoogle(AuthenticatedUser.id(), request.idToken()));
     }
 }
