@@ -20,12 +20,23 @@ public final class AccountTransactionDtos {
             LocalDate occurredOn
     ) {}
 
+    public record ManualRequest(
+            @NotNull Long userId,
+            @NotNull Long accountId,
+            @NotNull AccountTransactionType type,
+            @NotNull @DecimalMin("0.01") BigDecimal amount,
+            Long categoryId,
+            @NotBlank String description,
+            LocalDate occurredOn
+    ) {}
+
     public record Response(
             Long id,
             Long userId,
             AccountTransactionType type,
             Long accountId,
             Long counterAccountId,
+            Long categoryId,
             BigDecimal amount,
             String currency,
             LocalDate occurredOn,
