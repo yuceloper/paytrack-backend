@@ -34,4 +34,9 @@ public class IncomeOccurrenceRepositoryAdapter implements IncomeOccurrenceReposi
     public List<IncomeOccurrence> findBetween(Long userId, LocalDate from, LocalDate to) {
         return repository.findAllByUserIdAndExpectedDateBetweenOrderByExpectedDateAsc(userId, from, to);
     }
+
+    @Override
+    public Optional<IncomeOccurrence> findNextPending(Long userId, LocalDate from) {
+        return repository.findFirstByUserIdAndReceivedFalseAndExpectedDateGreaterThanEqualOrderByExpectedDateAsc(userId, from);
+    }
 }
