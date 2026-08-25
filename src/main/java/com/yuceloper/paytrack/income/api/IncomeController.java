@@ -40,8 +40,11 @@ public class IncomeController {
     }
 
     @PatchMapping("/occurrences/{id}/received")
-    public ApiResponse<IncomeResponses.Occurrence> markReceived(@PathVariable Long id) {
-        return ApiResponse.success(service.markReceived(id));
+    public ApiResponse<IncomeResponses.Occurrence> markReceived(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long accountId
+    ) {
+        return ApiResponse.success(service.markReceived(id, accountId));
     }
 
     @PatchMapping("/occurrences/{id}/pending")
