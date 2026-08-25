@@ -42,6 +42,10 @@ public class IncomeSource {
 
     private Integer recurrenceDay;
 
+    private Integer recurrenceInterval;
+
+    private LocalDate recurrenceEndDate;
+
     @Column(nullable = false)
     private LocalDate nextIncomeDate;
 
