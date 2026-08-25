@@ -1,7 +1,9 @@
 package com.yuceloper.paytrack.payment.application;
 
 import com.yuceloper.paytrack.payment.api.dto.PaymentResponse;
+import com.yuceloper.paytrack.payment.api.dto.PaymentUpsertRequest;
 import com.yuceloper.paytrack.payment.domain.Payment;
+import com.yuceloper.paytrack.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +22,70 @@ public class PaymentService {
         LocalDate start = LocalDate.now();
         LocalDate end = start.plusDays(days);
         return repository.findDueBetween(userId, start, end).stream()
+                .filter(payment -> !payment.isPaid())
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public PaymentResponse create(PaymentUpsertRequest request) {
+        Payment payment = Payment.builder()
+                .userId(request.userId())
+                .name(request.name())
+                .type(request.type())
+                .sourceType(request.sourceType())
+                .sourceId(request.sourceId())
+                .amount(request.amount())
+                .dueDate(request.dueDate())
+                .recurring(request.recurring())
+                .recurrenceDay(request.recurrenceDay())
+                .paid(false)
+                .institution(request.institution())
+                .note(request.note())
+                .build();
+        return toResponse(repository.save(payment));
+    }
+
+    @Transactional
+    public PaymentResponse update(Long id, PaymentUpsertRequest request) {
+        Payment payment = getEntity(id);
+        payment.setUserId(request.userId());
+        payment.setName(request.name());
+        payment.setType(request.type());
+        payment.setSourceType(request.sourceType());
+        payment.setSourceId(request.sourceId());
+        payment.setAmount(request.amount());
+        payment.setDueDate(request.dueDate());
+        payment.setRecurring(request.recurring());
+        payment.setRecurrenceDay(request.recurrenceDay());
+        payment.setInstitution(request.institution());
+        payment.setNote(request.note());
+        return toResponse(repository.save(payment));
+    }
+
+    @Transactional
+    public PaymentResponse markPaid(Long id) {
+        Payment payment = getEntity(id);
+        payment.markPaid();
+        return toResponse(repository.save(payment));
+    }
+
+    @Transactional
+    public PaymentResponse markPending(Long id) {
+        Payment payment = getEntity(id);
+        payment.markPending();
+        return toResponse(repository.save(payment));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        getEntity(id);
+        repository.deleteById(id);
+    }
+
+    private Payment getEntity(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + id));
     }
 
     private PaymentResponse toResponse(Payment payment) {
