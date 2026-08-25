@@ -31,6 +31,7 @@ public class AccountTransaction {
     private Long accountId;
 
     private Long counterAccountId;
+    private Long categoryId;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
