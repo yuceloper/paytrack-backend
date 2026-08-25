@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 @Service
@@ -32,10 +33,12 @@ public class IncomeService {
 
     @Transactional
     public IncomeResponses.Source createSource(IncomeSourceRequest request) {
+        validateRequest(request);
         IncomeSource source = sourceRepository.save(IncomeSource.builder()
                 .userId(request.userId()).name(request.name()).type(request.type()).amount(request.amount())
                 .currency(request.currency().trim().toUpperCase()).frequency(request.frequency())
-                .recurrenceDay(request.recurrenceDay()).nextIncomeDate(request.nextIncomeDate())
+                .recurrenceDay(resolveRecurrenceDay(request)).recurrenceInterval(resolveInterval(request))
+                .recurrenceEndDate(request.recurrenceEndDate()).nextIncomeDate(request.nextIncomeDate())
                 .active(true).note(request.note()).build());
         ensureOccurrence(source, source.getNextIncomeDate());
         return toSource(source);
@@ -60,9 +63,14 @@ public class IncomeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Income source not found: " + occurrence.getIncomeSourceId()));
         if (source.isActive() && source.getFrequency() != IncomeFrequency.ONE_TIME) {
             LocalDate nextDate = nextDate(source, occurrence.getExpectedDate());
-            source.setNextIncomeDate(nextDate);
-            sourceRepository.save(source);
-            ensureOccurrence(source, nextDate);
+            if (source.getRecurrenceEndDate() != null && nextDate.isAfter(source.getRecurrenceEndDate())) {
+                source.setActive(false);
+                sourceRepository.save(source);
+            } else {
+                source.setNextIncomeDate(nextDate);
+                sourceRepository.save(source);
+                ensureOccurrence(source, nextDate);
+            }
         }
         return toOccurrence(occurrence);
     }
@@ -77,6 +85,7 @@ public class IncomeService {
     }
 
     private void ensureOccurrence(IncomeSource source, LocalDate date) {
+        if (source.getRecurrenceEndDate() != null && date.isAfter(source.getRecurrenceEndDate())) return;
         if (occurrenceRepository.findBySourceIdAndExpectedDate(source.getId(), date).isPresent()) return;
         occurrenceRepository.save(IncomeOccurrence.builder()
                 .incomeSourceId(source.getId()).userId(source.getUserId()).name(source.getName())
@@ -84,20 +93,56 @@ public class IncomeService {
     }
 
     private LocalDate nextDate(IncomeSource source, LocalDate current) {
+        int interval = source.getRecurrenceInterval() != null ? source.getRecurrenceInterval() : 1;
         return switch (source.getFrequency()) {
-            case WEEKLY -> current.plusWeeks(1);
-            case YEARLY -> current.plusYears(1);
-            case MONTHLY -> {
-                LocalDate nextMonth = current.plusMonths(1).withDayOfMonth(1);
-                int desiredDay = source.getRecurrenceDay() != null ? source.getRecurrenceDay() : current.getDayOfMonth();
-                yield nextMonth.withDayOfMonth(Math.min(desiredDay, nextMonth.lengthOfMonth()));
-            }
+            case WEEKLY -> current.plusWeeks(interval);
+            case YEARLY -> safeYearly(current, interval);
+            case CUSTOM_DAYS -> current.plusDays(interval);
+            case CUSTOM_MONTHS -> safeMonthly(source, current, interval);
+            case MONTHLY -> safeMonthly(source, current, interval);
             case ONE_TIME -> current;
         };
     }
 
+    private LocalDate safeMonthly(IncomeSource source, LocalDate current, int interval) {
+        YearMonth target = YearMonth.from(current).plusMonths(interval);
+        int desiredDay = source.getRecurrenceDay() != null ? source.getRecurrenceDay() : current.getDayOfMonth();
+        return target.atDay(Math.min(desiredDay, target.lengthOfMonth()));
+    }
+
+    private LocalDate safeYearly(LocalDate current, int interval) {
+        YearMonth target = YearMonth.of(current.getYear() + interval, current.getMonth());
+        return target.atDay(Math.min(current.getDayOfMonth(), target.lengthOfMonth()));
+    }
+
+    private Integer resolveRecurrenceDay(IncomeSourceRequest request) {
+        if (request.frequency() == IncomeFrequency.MONTHLY || request.frequency() == IncomeFrequency.CUSTOM_MONTHS) {
+            return request.recurrenceDay() != null ? request.recurrenceDay() : request.nextIncomeDate().getDayOfMonth();
+        }
+        return null;
+    }
+
+    private Integer resolveInterval(IncomeSourceRequest request) {
+        if (request.frequency() == IncomeFrequency.ONE_TIME) return null;
+        return request.recurrenceInterval() != null ? request.recurrenceInterval() : 1;
+    }
+
+    private void validateRequest(IncomeSourceRequest request) {
+        if (request.recurrenceEndDate() != null && request.recurrenceEndDate().isBefore(request.nextIncomeDate())) {
+            throw new IllegalArgumentException("recurrenceEndDate must be on or after nextIncomeDate");
+        }
+        if (request.frequency() != IncomeFrequency.ONE_TIME &&
+                request.recurrenceInterval() != null && request.recurrenceInterval() < 1) {
+            throw new IllegalArgumentException("recurrenceInterval must be at least 1");
+        }
+    }
+
     private IncomeResponses.Source toSource(IncomeSource s) {
-        return new IncomeResponses.Source(s.getId(), s.getUserId(), s.getName(), s.getType(), s.getAmount(), s.getCurrency(), s.getFrequency(), s.getRecurrenceDay(), s.getNextIncomeDate(), s.isActive(), s.getNote());
+        return new IncomeResponses.Source(
+                s.getId(), s.getUserId(), s.getName(), s.getType(), s.getAmount(), s.getCurrency(),
+                s.getFrequency(), s.getRecurrenceDay(), s.getRecurrenceInterval(), s.getRecurrenceEndDate(),
+                s.getNextIncomeDate(), s.isActive(), s.getNote()
+        );
     }
 
     private IncomeResponses.Occurrence toOccurrence(IncomeOccurrence o) {
