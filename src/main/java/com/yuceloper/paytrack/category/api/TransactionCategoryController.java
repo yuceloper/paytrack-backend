@@ -1,5 +1,6 @@
 package com.yuceloper.paytrack.category.api;
 
+import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.category.api.dto.TransactionCategoryDtos;
 import com.yuceloper.paytrack.category.application.TransactionCategoryService;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
@@ -18,8 +19,8 @@ public class TransactionCategoryController {
     private final TransactionCategoryService service;
 
     @GetMapping
-    public ApiResponse<List<TransactionCategoryDtos.Response>> getAll(@RequestParam Long userId) {
-        return ApiResponse.success(service.getAll(userId));
+    public ApiResponse<List<TransactionCategoryDtos.Response>> getAll() {
+        return ApiResponse.success(service.getAll(AuthenticatedUser.id()));
     }
 
     @PostMapping
@@ -27,6 +28,6 @@ public class TransactionCategoryController {
     public ApiResponse<TransactionCategoryDtos.Response> create(
             @Valid @RequestBody TransactionCategoryDtos.CreateRequest request
     ) {
-        return ApiResponse.success(service.create(request));
+        return ApiResponse.success(service.create(AuthenticatedUser.id(), request));
     }
 }
