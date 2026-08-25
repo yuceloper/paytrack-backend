@@ -14,14 +14,14 @@ Aktif geliştirme sırasında tamamlanacak işler.
 - [x] Subscription entity
 - [x] Bill entity
 - [x] Repository port + persistence adapter katmanı
-- [ ] Service katmanı
-- [ ] DTO / mapper yapısı
-- [ ] CreditCard CRUD API
-- [ ] Loan CRUD API
-- [ ] Subscription CRUD API
-- [ ] Bill CRUD API
-- [ ] `GET /api/v1/payments/upcoming`
-- [ ] `GET /api/v1/dashboard/summary`
+- [x] Service katmanı
+- [x] DTO / mapper yapısı
+- [x] CreditCard CRUD API
+- [x] Loan CRUD API
+- [x] Subscription CRUD API
+- [x] Bill CRUD API
+- [x] `GET /api/v1/payments/upcoming`
+- [x] `GET /api/v1/dashboard/summary`
 
 ## Sonraki
 
@@ -29,10 +29,10 @@ Aktif geliştirme sırasında tamamlanacak işler.
 - [ ] Tekrarlayan ödeme oluşturma
 - [ ] Kredi taksit planı üretme
 - [ ] Ödeme tamamlandı işaretleme
-- [ ] Geciken ödeme hesaplama
-- [ ] Validation mesajları
+- [x] Geciken ödeme sorgulama altyapısı
+- [ ] Validation mesajlarını standardize et
 - [x] Global exception handler altyapısı
-- [ ] Swagger
+- [ ] Swagger / OpenAPI
 
 ## Bildirimler
 
@@ -48,7 +48,7 @@ Aktif geliştirme sırasında tamamlanacak işler.
 - [ ] Unit testler
 - [ ] Integration testler
 - [ ] API contract testleri
-- [ ] CI
+- [x] CI workflow
 - [ ] Dockerfile
 - [ ] Kod formatlama / lint kuralları
 
