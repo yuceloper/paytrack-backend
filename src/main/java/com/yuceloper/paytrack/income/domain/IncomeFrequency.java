@@ -4,5 +4,7 @@ public enum IncomeFrequency {
     ONE_TIME,
     WEEKLY,
     MONTHLY,
-    YEARLY
+    YEARLY,
+    CUSTOM_DAYS,
+    CUSTOM_MONTHS
 }
