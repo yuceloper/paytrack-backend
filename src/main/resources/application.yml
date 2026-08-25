@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: paytrack-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/paytrack}
+    username: ${DB_USERNAME:paytrack}
+    password: ${DB_PASSWORD:paytrack}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+server:
+  port: ${PORT:8080}
