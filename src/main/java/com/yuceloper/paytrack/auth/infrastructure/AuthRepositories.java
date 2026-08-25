@@ -9,6 +9,7 @@ import java.util.Optional;
 
 interface AuthUserJpaRepository extends JpaRepository<User, Long> {
     Optional<User> findByAuthProviderAndProviderSubject(AuthProvider authProvider, String providerSubject);
+    Optional<User> findByEmailIgnoreCase(String email);
 }
 
 interface RefreshTokenJpaRepository extends JpaRepository<RefreshToken, Long> {
