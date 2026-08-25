@@ -5,6 +5,7 @@ import com.yuceloper.paytrack.payment.api.dto.PaymentResponse;
 import com.yuceloper.paytrack.payment.api.dto.PaymentUpsertRequest;
 import com.yuceloper.paytrack.payment.domain.Payment;
 import com.yuceloper.paytrack.payment.domain.PaymentRecurrenceFrequency;
+import com.yuceloper.paytrack.payment.domain.PaymentSeriesScope;
 import com.yuceloper.paytrack.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +43,9 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .userId(request.userId()).name(request.name()).type(request.type())
                 .sourceType(request.sourceType()).sourceId(request.sourceId()).amount(request.amount())
-                .dueDate(request.dueDate()).recurring(request.recurring()).recurrenceDay(request.recurrenceDay())
+                .dueDate(request.dueDate()).recurring(request.recurring())
+                .seriesId(request.recurring() ? UUID.randomUUID().toString() : null)
+                .recurrenceDay(request.recurrenceDay())
                 .recurrenceFrequency(resolveFrequency(request)).recurrenceInterval(resolveInterval(request))
                 .recurrenceEndDate(request.recurrenceEndDate())
                 .paid(false).institution(request.institution()).note(request.note()).build();
@@ -50,16 +54,27 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse update(Long id, PaymentUpsertRequest request) {
-        Payment payment = getEntity(id);
-        payment.setUserId(request.userId()); payment.setName(request.name()); payment.setType(request.type());
-        payment.setSourceType(request.sourceType()); payment.setSourceId(request.sourceId()); payment.setAmount(request.amount());
-        payment.setDueDate(request.dueDate()); payment.setRecurring(request.recurring()); payment.setRecurrenceDay(request.recurrenceDay());
-        payment.setRecurrenceFrequency(resolveFrequency(request)); payment.setRecurrenceInterval(resolveInterval(request));
-        payment.setRecurrenceEndDate(request.recurrenceEndDate());
-        payment.setInstitution(request.institution()); payment.setNote(request.note());
-        validateRecurrence(payment);
-        return toResponse(repository.save(payment));
+    public PaymentResponse update(Long id, PaymentUpsertRequest request, PaymentSeriesScope scope) {
+        Payment current = getEntity(id);
+        PaymentSeriesScope safeScope = scope != null ? scope : PaymentSeriesScope.THIS;
+
+        if (safeScope == PaymentSeriesScope.THIS) {
+            if (current.isRecurring()) {
+                recurrenceService.createNextOccurrenceIfNeeded(current);
+            }
+            applyRequest(current, request, true);
+            validateRecurrence(current);
+            return toResponse(repository.save(current));
+        }
+
+        List<Payment> targets = seriesTargets(current, safeScope);
+        for (Payment target : targets) {
+            boolean isCurrent = target.getId().equals(current.getId());
+            applyRequest(target, request, isCurrent);
+            validateRecurrence(target);
+        }
+        repository.saveAll(targets);
+        return toResponse(current);
     }
 
     @Transactional
@@ -87,9 +102,56 @@ public class PaymentService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        getEntity(id);
-        repository.deleteById(id);
+    public void delete(Long id, PaymentSeriesScope scope) {
+        Payment current = getEntity(id);
+        PaymentSeriesScope safeScope = scope != null ? scope : PaymentSeriesScope.THIS;
+
+        if (safeScope == PaymentSeriesScope.THIS) {
+            if (current.isRecurring()) {
+                recurrenceService.createNextOccurrenceIfNeeded(current);
+            }
+            repository.deleteById(id);
+            return;
+        }
+
+        List<Payment> targets = seriesTargets(current, safeScope);
+        repository.deleteAll(targets);
+    }
+
+    private List<Payment> seriesTargets(Payment current, PaymentSeriesScope scope) {
+        if (current.getSeriesId() == null || current.getSeriesId().isBlank()) {
+            return List.of(current);
+        }
+
+        return repository.findBySeriesId(current.getSeriesId()).stream()
+                .filter(item -> switch (scope) {
+                    case THIS -> item.getId().equals(current.getId());
+                    case THIS_AND_FUTURE -> !item.getDueDate().isBefore(current.getDueDate());
+                    case ALL -> true;
+                })
+                .filter(item -> item.getId().equals(current.getId()) || !item.isPaid())
+                .toList();
+    }
+
+    private void applyRequest(Payment payment, PaymentUpsertRequest request, boolean updateDueDate) {
+        payment.setUserId(request.userId());
+        payment.setName(request.name());
+        payment.setType(request.type());
+        payment.setSourceType(request.sourceType());
+        payment.setSourceId(request.sourceId());
+        payment.setAmount(request.amount());
+        if (updateDueDate) payment.setDueDate(request.dueDate());
+        payment.setRecurring(request.recurring());
+        payment.setRecurrenceDay(request.recurrenceDay());
+        payment.setRecurrenceFrequency(resolveFrequency(request));
+        payment.setRecurrenceInterval(resolveInterval(request));
+        payment.setRecurrenceEndDate(request.recurrenceEndDate());
+        payment.setInstitution(request.institution());
+        payment.setNote(request.note());
+
+        if (request.recurring() && (payment.getSeriesId() == null || payment.getSeriesId().isBlank())) {
+            payment.setSeriesId(UUID.randomUUID().toString());
+        }
     }
 
     private Payment getEntity(Long id) {
@@ -119,7 +181,7 @@ public class PaymentService {
     private PaymentResponse toResponse(Payment payment) {
         return new PaymentResponse(
                 payment.getId(), payment.getUserId(), payment.getName(), payment.getType(), payment.getSourceType(), payment.getSourceId(),
-                payment.getAmount(), payment.getDueDate(), payment.isRecurring(), payment.getRecurrenceDay(),
+                payment.getAmount(), payment.getDueDate(), payment.isRecurring(), payment.getSeriesId(), payment.getRecurrenceDay(),
                 payment.getRecurrenceFrequency(), payment.getRecurrenceInterval(), payment.getRecurrenceEndDate(),
                 payment.isPaid(), payment.getInstitution(), payment.getNote()
         );
