@@ -15,4 +15,5 @@ interface SpringDataIncomeSourceRepository extends JpaRepository<IncomeSource, L
 interface SpringDataIncomeOccurrenceRepository extends JpaRepository<IncomeOccurrence, Long> {
     Optional<IncomeOccurrence> findByIncomeSourceIdAndExpectedDate(Long incomeSourceId, LocalDate expectedDate);
     List<IncomeOccurrence> findAllByUserIdAndExpectedDateBetweenOrderByExpectedDateAsc(Long userId, LocalDate from, LocalDate to);
+    Optional<IncomeOccurrence> findFirstByUserIdAndReceivedFalseAndExpectedDateGreaterThanEqualOrderByExpectedDateAsc(Long userId, LocalDate from);
 }
