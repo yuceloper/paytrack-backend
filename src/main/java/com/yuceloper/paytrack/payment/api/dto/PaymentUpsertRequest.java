@@ -12,7 +12,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record PaymentUpsertRequest(
-        @NotNull @Positive Long userId,
         @NotBlank String name,
         @NotNull PaymentType type,
         PaymentSourceType sourceType,
