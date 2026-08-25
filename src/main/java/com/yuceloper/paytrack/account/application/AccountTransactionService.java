@@ -27,13 +27,13 @@ public class AccountTransactionService {
     }
 
     @Transactional
-    public AccountTransactionDtos.Response transfer(AccountTransactionDtos.TransferRequest request) {
+    public AccountTransactionDtos.Response transfer(Long userId, AccountTransactionDtos.TransferRequest request) {
         if (request.fromAccountId().equals(request.toAccountId())) {
             throw new IllegalArgumentException("fromAccountId and toAccountId must be different");
         }
         Account from = getAccount(request.fromAccountId());
         Account to = getAccount(request.toAccountId());
-        validateOwnershipAndCurrency(request.userId(), from, to);
+        validateOwnershipAndCurrency(userId, from, to);
 
         from.setBalance(from.getBalance().subtract(request.amount()));
         to.setBalance(to.getBalance().add(request.amount()));
@@ -41,7 +41,7 @@ public class AccountTransactionService {
         accountRepository.save(to);
 
         return toResponse(transactionRepository.save(AccountTransaction.builder()
-                .userId(request.userId())
+                .userId(userId)
                 .type(AccountTransactionType.TRANSFER)
                 .accountId(from.getId())
                 .counterAccountId(to.getId())
@@ -53,12 +53,12 @@ public class AccountTransactionService {
     }
 
     @Transactional
-    public AccountTransactionDtos.Response manual(AccountTransactionDtos.ManualRequest request) {
+    public AccountTransactionDtos.Response manual(Long userId, AccountTransactionDtos.ManualRequest request) {
         if (request.type() == AccountTransactionType.TRANSFER) {
             throw new IllegalArgumentException("Use transfer endpoint for TRANSFER transactions");
         }
         Account account = getAccount(request.accountId());
-        validateOwner(request.userId(), account);
+        validateOwner(userId, account);
 
         if (request.type() == AccountTransactionType.EXPENSE) {
             account.setBalance(account.getBalance().subtract(request.amount()));
@@ -70,7 +70,7 @@ public class AccountTransactionService {
         accountRepository.save(account);
 
         AccountTransaction saved = transactionRepository.save(AccountTransaction.builder()
-                .userId(request.userId())
+                .userId(userId)
                 .type(request.type())
                 .accountId(account.getId())
                 .categoryId(request.categoryId())
@@ -136,7 +136,9 @@ public class AccountTransactionService {
     }
 
     private void validateOwner(Long userId, Account account) {
-        if (!account.getUserId().equals(userId)) throw new IllegalArgumentException("Account does not belong to user");
+        if (!account.getUserId().equals(userId)) {
+            throw new ResourceNotFoundException("Account not found: " + account.getId());
+        }
     }
 
     private void validateOwnershipAndCurrency(Long userId, Account from, Account to) {
