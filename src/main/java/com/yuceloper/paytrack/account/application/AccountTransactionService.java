@@ -4,6 +4,9 @@ import com.yuceloper.paytrack.account.api.dto.AccountTransactionDtos;
 import com.yuceloper.paytrack.account.domain.Account;
 import com.yuceloper.paytrack.account.domain.AccountTransaction;
 import com.yuceloper.paytrack.account.domain.AccountTransactionType;
+import com.yuceloper.paytrack.category.application.TransactionCategoryRepository;
+import com.yuceloper.paytrack.category.domain.TransactionCategory;
+import com.yuceloper.paytrack.category.domain.TransactionCategoryType;
 import com.yuceloper.paytrack.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ public class AccountTransactionService {
 
     private final AccountRepository accountRepository;
     private final AccountTransactionRepository transactionRepository;
+    private final TransactionCategoryRepository categoryRepository;
 
     public List<AccountTransactionDtos.Response> getRange(Long userId, LocalDate from, LocalDate to) {
         if (to.isBefore(from)) throw new IllegalArgumentException("to must be on or after from");
@@ -59,6 +63,7 @@ public class AccountTransactionService {
         }
         Account account = getAccount(request.accountId());
         validateOwner(userId, account);
+        validateCategory(userId, request.categoryId(), request.type());
 
         if (request.type() == AccountTransactionType.EXPENSE) {
             account.setBalance(account.getBalance().subtract(request.amount()));
@@ -146,6 +151,21 @@ public class AccountTransactionService {
         validateOwner(userId, to);
         if (!from.getCurrency().equalsIgnoreCase(to.getCurrency())) {
             throw new IllegalArgumentException("Transfer accounts must use the same currency");
+        }
+    }
+
+    private void validateCategory(Long userId, Long categoryId, AccountTransactionType transactionType) {
+        if (categoryId == null) return;
+        TransactionCategory category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + categoryId));
+        if (!userId.equals(category.getUserId()) || !category.isActive()) {
+            throw new ResourceNotFoundException("Category not found: " + categoryId);
+        }
+        TransactionCategoryType expected = transactionType == AccountTransactionType.INCOME
+                ? TransactionCategoryType.INCOME
+                : TransactionCategoryType.EXPENSE;
+        if (category.getType() != TransactionCategoryType.BOTH && category.getType() != expected) {
+            throw new IllegalArgumentException("Category is not compatible with transaction type");
         }
     }
 
