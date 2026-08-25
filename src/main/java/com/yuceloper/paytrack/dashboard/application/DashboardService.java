@@ -3,6 +3,8 @@ package com.yuceloper.paytrack.dashboard.application;
 import com.yuceloper.paytrack.creditcard.application.CreditCardRepository;
 import com.yuceloper.paytrack.creditcard.domain.CreditCard;
 import com.yuceloper.paytrack.dashboard.api.DashboardSummaryResponse;
+import com.yuceloper.paytrack.income.application.IncomeOccurrenceRepository;
+import com.yuceloper.paytrack.income.domain.IncomeOccurrence;
 import com.yuceloper.paytrack.payment.application.PaymentRepository;
 import com.yuceloper.paytrack.payment.domain.Payment;
 import com.yuceloper.paytrack.subscription.application.SubscriptionRepository;
@@ -16,6 +18,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class DashboardService {
     private final PaymentRepository paymentRepository;
     private final CreditCardRepository creditCardRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final IncomeOccurrenceRepository incomeOccurrenceRepository;
 
     public DashboardSummaryResponse getSummary(Long userId, LocalDate today) {
         LocalDate monthStart = today.withDayOfMonth(1);
@@ -61,6 +65,20 @@ public class DashboardService {
                 .multiply(TWELVE)
                 .setScale(2, RoundingMode.HALF_UP);
 
+        List<IncomeOccurrence> monthlyIncomes = incomeOccurrenceRepository.findBetween(userId, monthStart, monthEnd)
+                .stream()
+                .filter(this::isTryCurrency)
+                .toList();
+        BigDecimal expectedIncomeThisMonth = sumIncome(monthlyIncomes);
+        BigDecimal receivedIncomeThisMonth = sumIncome(monthlyIncomes.stream().filter(IncomeOccurrence::isReceived).toList());
+        BigDecimal plannedNetCashFlowThisMonth = expectedIncomeThisMonth.subtract(dueThisMonth);
+
+        Optional<IncomeOccurrence> nextIncome = incomeOccurrenceRepository.findNextPending(userId, today)
+                .filter(this::isTryCurrency);
+        BigDecimal requiredUntilNextIncome = nextIncome
+                .map(income -> sumPending(paymentRepository.findDueBetween(userId, today, income.getExpectedDate())))
+                .orElse(BigDecimal.ZERO);
+
         return new DashboardSummaryResponse(
                 dueThisMonth,
                 dueNextSevenDays,
@@ -69,7 +87,14 @@ public class DashboardService {
                 overduePayments.size(),
                 totalCreditCardDebt,
                 monthlySubscriptionCost,
-                yearlySubscriptionCost
+                yearlySubscriptionCost,
+                expectedIncomeThisMonth,
+                receivedIncomeThisMonth,
+                plannedNetCashFlowThisMonth,
+                nextIncome.map(IncomeOccurrence::getName).orElse(null),
+                nextIncome.map(IncomeOccurrence::getExpectedDate).orElse(null),
+                nextIncome.map(IncomeOccurrence::getAmount).orElse(null),
+                requiredUntilNextIncome
         );
     }
 
@@ -81,12 +106,25 @@ public class DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    private BigDecimal sumIncome(List<IncomeOccurrence> incomes) {
+        return incomes.stream()
+                .map(IncomeOccurrence::getAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     private boolean isTryCurrency(Subscription subscription) {
-        if (subscription.getCurrency() == null) {
-            return false;
-        }
-        String currency = subscription.getCurrency().trim().toUpperCase(Locale.ROOT);
-        return currency.equals("TRY") || currency.equals("TL");
+        return isTryCurrency(subscription.getCurrency());
+    }
+
+    private boolean isTryCurrency(IncomeOccurrence income) {
+        return isTryCurrency(income.getCurrency());
+    }
+
+    private boolean isTryCurrency(String currency) {
+        if (currency == null) return false;
+        String normalized = currency.trim().toUpperCase(Locale.ROOT);
+        return normalized.equals("TRY") || normalized.equals("TL");
     }
 
     private BigDecimal monthlyEquivalent(Subscription subscription) {
