@@ -17,6 +17,7 @@ public record PaymentResponse(
         BigDecimal amount,
         LocalDate dueDate,
         boolean recurring,
+        String seriesId,
         Integer recurrenceDay,
         PaymentRecurrenceFrequency recurrenceFrequency,
         Integer recurrenceInterval,
