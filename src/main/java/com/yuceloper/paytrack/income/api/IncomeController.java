@@ -1,8 +1,10 @@
 package com.yuceloper.paytrack.income.api;
 
+import com.yuceloper.paytrack.income.api.dto.IncomeOccurrenceUpdateRequest;
 import com.yuceloper.paytrack.income.api.dto.IncomeResponses;
 import com.yuceloper.paytrack.income.api.dto.IncomeSourceRequest;
 import com.yuceloper.paytrack.income.application.IncomeService;
+import com.yuceloper.paytrack.income.domain.IncomeSeriesScope;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,24 @@ public class IncomeController {
             @RequestParam LocalDate to
     ) {
         return ApiResponse.success(service.getOccurrences(userId, from, to));
+    }
+
+    @PutMapping("/occurrences/{id}")
+    public ApiResponse<IncomeResponses.Occurrence> updateOccurrence(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "THIS") IncomeSeriesScope scope,
+            @Valid @RequestBody IncomeOccurrenceUpdateRequest request
+    ) {
+        return ApiResponse.success(service.updateOccurrence(id, request, scope));
+    }
+
+    @DeleteMapping("/occurrences/{id}")
+    public ApiResponse<Void> deleteOccurrence(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "THIS") IncomeSeriesScope scope
+    ) {
+        service.deleteOccurrence(id, scope);
+        return ApiResponse.success(null);
     }
 
     @PatchMapping("/occurrences/{id}/received")
