@@ -12,7 +12,6 @@ public final class AccountTransactionDtos {
     private AccountTransactionDtos() {}
 
     public record TransferRequest(
-            @NotNull Long userId,
             @NotNull Long fromAccountId,
             @NotNull Long toAccountId,
             @NotNull @DecimalMin("0.01") BigDecimal amount,
@@ -21,7 +20,6 @@ public final class AccountTransactionDtos {
     ) {}
 
     public record ManualRequest(
-            @NotNull Long userId,
             @NotNull Long accountId,
             @NotNull AccountTransactionType type,
             @NotNull @DecimalMin("0.01") BigDecimal amount,
