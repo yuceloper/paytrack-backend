@@ -12,4 +12,6 @@ public class AuthDtos {
     ) {}
 
     public record RefreshRequest(String refreshToken) {}
+
+    public record GoogleLinkRequest(String idToken) {}
 }
