@@ -27,6 +27,15 @@ public class PaymentService {
                 .toList();
     }
 
+    public List<PaymentResponse> getRange(Long userId, LocalDate from, LocalDate to) {
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("to must be on or after from");
+        }
+        return repository.findDueBetween(userId, from, to).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public PaymentResponse create(PaymentUpsertRequest request) {
         Payment payment = Payment.builder()
