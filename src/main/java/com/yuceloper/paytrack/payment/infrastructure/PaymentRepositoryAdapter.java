@@ -21,6 +21,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    public List<Payment> saveAll(List<Payment> payments) {
+        return repository.saveAll(payments);
+    }
+
+    @Override
     public Optional<Payment> findById(Long id) {
         return repository.findById(id);
     }
@@ -36,6 +41,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    public List<Payment> findBySeriesId(String seriesId) {
+        return repository.findAllBySeriesIdOrderByDueDateAsc(seriesId);
+    }
+
+    @Override
     public boolean existsByUserIdAndNameAndDueDate(Long userId, String name, LocalDate dueDate) {
         return repository.existsByUserIdAndNameAndDueDate(userId, name, dueDate);
     }
@@ -43,5 +53,10 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     @Override
     public void deleteById(Long id) {
         repository.deleteById(id);
+    }
+
+    @Override
+    public void deleteAll(List<Payment> payments) {
+        repository.deleteAll(payments);
     }
 }
