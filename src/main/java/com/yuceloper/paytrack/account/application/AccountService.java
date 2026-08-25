@@ -23,9 +23,9 @@ public class AccountService {
     }
 
     @Transactional
-    public AccountResponse create(AccountUpsertRequest request) {
+    public AccountResponse create(Long userId, AccountUpsertRequest request) {
         Account account = Account.builder()
-                .userId(request.userId())
+                .userId(userId)
                 .name(request.name().trim())
                 .type(request.type())
                 .institution(trimToNull(request.institution()))
@@ -37,9 +37,8 @@ public class AccountService {
     }
 
     @Transactional
-    public AccountResponse update(Long id, AccountUpsertRequest request) {
-        Account account = getEntity(id);
-        account.setUserId(request.userId());
+    public AccountResponse update(Long userId, Long id, AccountUpsertRequest request) {
+        Account account = getEntity(userId, id);
         account.setName(request.name().trim());
         account.setType(request.type());
         account.setInstitution(trimToNull(request.institution()));
@@ -50,14 +49,18 @@ public class AccountService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        getEntity(id);
+    public void delete(Long userId, Long id) {
+        getEntity(userId, id);
         repository.deleteById(id);
     }
 
-    private Account getEntity(Long id) {
-        return repository.findById(id)
+    private Account getEntity(Long userId, Long id) {
+        Account account = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + id));
+        if (!userId.equals(account.getUserId())) {
+            throw new ResourceNotFoundException("Account not found: " + id);
+        }
+        return account;
     }
 
     private AccountResponse toResponse(Account account) {
