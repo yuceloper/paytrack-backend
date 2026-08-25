@@ -15,6 +15,8 @@ public record IncomeSourceRequest(
         @NotBlank String currency,
         @NotNull IncomeFrequency frequency,
         @Min(1) @Max(31) Integer recurrenceDay,
+        @Min(1) Integer recurrenceInterval,
+        LocalDate recurrenceEndDate,
         @NotNull LocalDate nextIncomeDate,
         String note
 ) {}
