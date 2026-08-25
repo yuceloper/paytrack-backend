@@ -8,7 +8,6 @@ public final class TransactionCategoryDtos {
     private TransactionCategoryDtos() {}
 
     public record CreateRequest(
-            @NotNull Long userId,
             @NotBlank String name,
             @NotNull TransactionCategoryType type,
             String iconKey
