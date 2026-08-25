@@ -22,8 +22,6 @@ public class User {
     @Column(nullable = false)
     private String email;
 
-    private Integer salaryDay;
-
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
