@@ -44,6 +44,8 @@ public class Payment {
     @Builder.Default
     private boolean recurring = false;
 
+    private String seriesId;
+
     private Integer recurrenceDay;
 
     @Enumerated(EnumType.STRING)
