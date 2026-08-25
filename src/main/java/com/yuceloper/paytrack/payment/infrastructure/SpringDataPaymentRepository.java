@@ -7,5 +7,5 @@ import java.time.LocalDate;
 import java.util.List;
 
 interface SpringDataPaymentRepository extends JpaRepository<Payment, Long> {
-    List<Payment> findAllByDueDateBetweenOrderByDueDateAsc(LocalDate start, LocalDate end);
+    List<Payment> findAllByUserIdAndDueDateBetweenOrderByDueDateAsc(Long userId, LocalDate start, LocalDate end);
 }
