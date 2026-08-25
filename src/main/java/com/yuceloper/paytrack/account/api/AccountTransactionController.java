@@ -1,0 +1,35 @@
+package com.yuceloper.paytrack.account.api;
+
+import com.yuceloper.paytrack.account.api.dto.AccountTransactionDtos;
+import com.yuceloper.paytrack.account.application.AccountTransactionService;
+import com.yuceloper.paytrack.shared.api.ApiResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/account-transactions")
+@RequiredArgsConstructor
+public class AccountTransactionController {
+
+    private final AccountTransactionService service;
+
+    @GetMapping
+    public ApiResponse<List<AccountTransactionDtos.Response>> getRange(
+            @RequestParam Long userId,
+            @RequestParam LocalDate from,
+            @RequestParam LocalDate to
+    ) {
+        return ApiResponse.success(service.getRange(userId, from, to));
+    }
+
+    @PostMapping("/transfer")
+    public ApiResponse<AccountTransactionDtos.Response> transfer(
+            @Valid @RequestBody AccountTransactionDtos.TransferRequest request
+    ) {
+        return ApiResponse.success(service.transfer(request));
+    }
+}
