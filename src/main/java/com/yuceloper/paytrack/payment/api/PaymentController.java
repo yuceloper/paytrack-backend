@@ -3,6 +3,7 @@ package com.yuceloper.paytrack.payment.api;
 import com.yuceloper.paytrack.payment.api.dto.PaymentResponse;
 import com.yuceloper.paytrack.payment.api.dto.PaymentUpsertRequest;
 import com.yuceloper.paytrack.payment.application.PaymentService;
+import com.yuceloper.paytrack.payment.domain.PaymentSeriesScope;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,8 +44,12 @@ public class PaymentController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<PaymentResponse> update(@PathVariable Long id, @Valid @RequestBody PaymentUpsertRequest request) {
-        return ApiResponse.success(service.update(id, request));
+    public ApiResponse<PaymentResponse> update(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "THIS") PaymentSeriesScope scope,
+            @Valid @RequestBody PaymentUpsertRequest request
+    ) {
+        return ApiResponse.success(service.update(id, request, scope));
     }
 
     @PatchMapping("/{id}/paid")
@@ -61,8 +66,11 @@ public class PaymentController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
-        service.delete(id);
+    public ApiResponse<Void> delete(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "THIS") PaymentSeriesScope scope
+    ) {
+        service.delete(id, scope);
         return ApiResponse.success(null);
     }
 }
