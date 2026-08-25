@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,11 @@ public class PaymentRecurrenceService {
     public void createNextOccurrenceIfNeeded(Payment payment) {
         if (!payment.isRecurring()) {
             return;
+        }
+
+        if (payment.getSeriesId() == null || payment.getSeriesId().isBlank()) {
+            payment.setSeriesId(UUID.randomUUID().toString());
+            repository.save(payment);
         }
 
         PaymentRecurrenceFrequency frequency = payment.getRecurrenceFrequency() != null
@@ -48,6 +54,7 @@ public class PaymentRecurrenceService {
                 .amount(payment.getAmount())
                 .dueDate(nextDueDate)
                 .recurring(true)
+                .seriesId(payment.getSeriesId())
                 .recurrenceDay(payment.getRecurrenceDay())
                 .recurrenceFrequency(frequency)
                 .recurrenceInterval(interval)
