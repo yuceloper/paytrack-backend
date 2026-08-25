@@ -4,18 +4,22 @@ Aktif geliştirme sırasında tamamlanacak işler.
 
 ## Şimdi
 
-- [ ] PostgreSQL local development yapılandırması
-- [ ] `docker-compose.yml`
-- [ ] `application.yml` ve local profile
-- [ ] User entity
-- [ ] Payment domain modelini netleştir
-- [ ] CreditCard entity
-- [ ] Loan entity
-- [ ] Subscription entity
-- [ ] Bill entity
-- [ ] Repository katmanı
+- [x] PostgreSQL local development yapılandırması
+- [x] `docker-compose.yml`
+- [x] `application.yml` ve local profile
+- [x] User entity
+- [x] Payment domain modelini modüler source referanslarıyla netleştir
+- [x] CreditCard entity
+- [x] Loan entity
+- [x] Subscription entity
+- [x] Bill entity
+- [x] Repository port + persistence adapter katmanı
 - [ ] Service katmanı
 - [ ] DTO / mapper yapısı
+- [ ] CreditCard CRUD API
+- [ ] Loan CRUD API
+- [ ] Subscription CRUD API
+- [ ] Bill CRUD API
 - [ ] `GET /api/v1/payments/upcoming`
 - [ ] `GET /api/v1/dashboard/summary`
 
@@ -27,7 +31,7 @@ Aktif geliştirme sırasında tamamlanacak işler.
 - [ ] Ödeme tamamlandı işaretleme
 - [ ] Geciken ödeme hesaplama
 - [ ] Validation mesajları
-- [ ] Global exception handler
+- [x] Global exception handler altyapısı
 - [ ] Swagger
 
 ## Bildirimler
