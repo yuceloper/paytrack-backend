@@ -10,5 +10,6 @@ public interface PaymentRepository {
     Payment save(Payment payment);
     Optional<Payment> findById(Long id);
     List<Payment> findDueBetween(Long userId, LocalDate start, LocalDate end);
+    List<Payment> findOverdue(Long userId, LocalDate today);
     void deleteById(Long id);
 }
