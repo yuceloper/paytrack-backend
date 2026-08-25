@@ -1,6 +1,7 @@
 package com.yuceloper.paytrack.dashboard.api;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record DashboardSummaryResponse(
         BigDecimal dueThisMonth,
@@ -10,6 +11,13 @@ public record DashboardSummaryResponse(
         int overduePaymentCount,
         BigDecimal totalCreditCardDebt,
         BigDecimal monthlySubscriptionCost,
-        BigDecimal yearlySubscriptionCost
+        BigDecimal yearlySubscriptionCost,
+        BigDecimal expectedIncomeThisMonth,
+        BigDecimal receivedIncomeThisMonth,
+        BigDecimal plannedNetCashFlowThisMonth,
+        String nextIncomeName,
+        LocalDate nextIncomeDate,
+        BigDecimal nextIncomeAmount,
+        BigDecimal requiredUntilNextIncome
 ) {
 }
