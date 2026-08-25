@@ -1,6 +1,7 @@
 package com.yuceloper.paytrack.auth.infrastructure;
 
 import com.yuceloper.paytrack.user.domain.User;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +38,15 @@ public class JwtService {
                 .expiration(Date.from(now.plus(accessTtl)))
                 .signWith(key)
                 .compact();
+    }
+
+    public Long parseUserId(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return Long.valueOf(claims.getSubject());
     }
 
     public long accessTokenExpiresInSeconds() {
