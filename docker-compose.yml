@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: paytrack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paytrack
+      POSTGRES_USER: paytrack
+      POSTGRES_PASSWORD: paytrack
+    ports:
+      - "5432:5432"
+    volumes:
+      - paytrack_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paytrack -d paytrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  paytrack_postgres_data:
