@@ -1,5 +1,6 @@
 package com.yuceloper.paytrack.payment.api.dto;
 
+import com.yuceloper.paytrack.payment.domain.PaymentRecurrenceFrequency;
 import com.yuceloper.paytrack.payment.domain.PaymentSourceType;
 import com.yuceloper.paytrack.payment.domain.PaymentType;
 
@@ -16,6 +17,10 @@ public record PaymentResponse(
         BigDecimal amount,
         LocalDate dueDate,
         boolean recurring,
+        Integer recurrenceDay,
+        PaymentRecurrenceFrequency recurrenceFrequency,
+        Integer recurrenceInterval,
+        LocalDate recurrenceEndDate,
         boolean paid,
         String institution,
         String note
