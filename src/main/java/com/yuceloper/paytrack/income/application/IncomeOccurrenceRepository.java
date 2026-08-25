@@ -11,4 +11,5 @@ public interface IncomeOccurrenceRepository {
     Optional<IncomeOccurrence> findById(Long id);
     Optional<IncomeOccurrence> findBySourceIdAndExpectedDate(Long sourceId, LocalDate date);
     List<IncomeOccurrence> findBetween(Long userId, LocalDate from, LocalDate to);
+    Optional<IncomeOccurrence> findNextPending(Long userId, LocalDate from);
 }
