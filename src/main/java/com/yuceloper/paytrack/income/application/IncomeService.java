@@ -1,5 +1,6 @@
 package com.yuceloper.paytrack.income.application;
 
+import com.yuceloper.paytrack.account.application.AccountTransactionService;
 import com.yuceloper.paytrack.income.api.dto.IncomeResponses;
 import com.yuceloper.paytrack.income.api.dto.IncomeSourceRequest;
 import com.yuceloper.paytrack.income.domain.*;
@@ -18,6 +19,7 @@ public class IncomeService {
 
     private final IncomeSourceRepository sourceRepository;
     private final IncomeOccurrenceRepository occurrenceRepository;
+    private final AccountTransactionService accountTransactionService;
 
     public List<IncomeResponses.Source> getSources(Long userId) {
         return sourceRepository.findAllByUserId(userId).stream().map(this::toSource).toList();
@@ -31,27 +33,28 @@ public class IncomeService {
     @Transactional
     public IncomeResponses.Source createSource(IncomeSourceRequest request) {
         IncomeSource source = sourceRepository.save(IncomeSource.builder()
-                .userId(request.userId())
-                .name(request.name())
-                .type(request.type())
-                .amount(request.amount())
-                .currency(request.currency().trim().toUpperCase())
-                .frequency(request.frequency())
-                .recurrenceDay(request.recurrenceDay())
-                .nextIncomeDate(request.nextIncomeDate())
-                .active(true)
-                .note(request.note())
-                .build());
+                .userId(request.userId()).name(request.name()).type(request.type()).amount(request.amount())
+                .currency(request.currency().trim().toUpperCase()).frequency(request.frequency())
+                .recurrenceDay(request.recurrenceDay()).nextIncomeDate(request.nextIncomeDate())
+                .active(true).note(request.note()).build());
         ensureOccurrence(source, source.getNextIncomeDate());
         return toSource(source);
     }
 
     @Transactional
-    public IncomeResponses.Occurrence markReceived(Long occurrenceId) {
+    public IncomeResponses.Occurrence markReceived(Long occurrenceId, Long accountId) {
         IncomeOccurrence occurrence = occurrenceRepository.findById(occurrenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Income occurrence not found: " + occurrenceId));
-        if (!occurrence.isReceived()) occurrence.markReceived();
+        boolean wasReceived = occurrence.isReceived();
+        if (!wasReceived) occurrence.markReceived();
         occurrenceRepository.save(occurrence);
+
+        if (!wasReceived && accountId != null) {
+            accountTransactionService.recordIncome(
+                    accountId, occurrence.getUserId(), occurrence.getAmount(), occurrence.getName(),
+                    "INCOME_OCCURRENCE", occurrence.getId(), LocalDate.now()
+            );
+        }
 
         IncomeSource source = sourceRepository.findById(occurrence.getIncomeSourceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Income source not found: " + occurrence.getIncomeSourceId()));
@@ -68,6 +71,7 @@ public class IncomeService {
     public IncomeResponses.Occurrence markPending(Long occurrenceId) {
         IncomeOccurrence occurrence = occurrenceRepository.findById(occurrenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Income occurrence not found: " + occurrenceId));
+        if (occurrence.isReceived()) accountTransactionService.reverseIncome("INCOME_OCCURRENCE", occurrence.getId());
         occurrence.markPending();
         return toOccurrence(occurrenceRepository.save(occurrence));
     }
@@ -75,14 +79,8 @@ public class IncomeService {
     private void ensureOccurrence(IncomeSource source, LocalDate date) {
         if (occurrenceRepository.findBySourceIdAndExpectedDate(source.getId(), date).isPresent()) return;
         occurrenceRepository.save(IncomeOccurrence.builder()
-                .incomeSourceId(source.getId())
-                .userId(source.getUserId())
-                .name(source.getName())
-                .amount(source.getAmount())
-                .currency(source.getCurrency())
-                .expectedDate(date)
-                .received(false)
-                .build());
+                .incomeSourceId(source.getId()).userId(source.getUserId()).name(source.getName())
+                .amount(source.getAmount()).currency(source.getCurrency()).expectedDate(date).received(false).build());
     }
 
     private LocalDate nextDate(IncomeSource source, LocalDate current) {
