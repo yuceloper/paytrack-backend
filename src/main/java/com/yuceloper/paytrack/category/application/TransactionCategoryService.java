@@ -26,14 +26,14 @@ public class TransactionCategoryService {
     }
 
     @Transactional
-    public TransactionCategoryDtos.Response create(TransactionCategoryDtos.CreateRequest request) {
-        repository.findByUserIdAndName(request.userId(), request.name().trim())
+    public TransactionCategoryDtos.Response create(Long userId, TransactionCategoryDtos.CreateRequest request) {
+        repository.findByUserIdAndName(userId, request.name().trim())
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Category name already exists");
                 });
 
         TransactionCategory saved = repository.save(TransactionCategory.builder()
-                .userId(request.userId())
+                .userId(userId)
                 .name(request.name().trim())
                 .type(request.type())
                 .iconKey(normalizeIcon(request.iconKey()))
