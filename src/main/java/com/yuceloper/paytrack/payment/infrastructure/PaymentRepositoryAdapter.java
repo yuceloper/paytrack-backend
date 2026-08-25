@@ -34,4 +34,9 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public List<Payment> findOverdue(Long userId, LocalDate today) {
         return repository.findAllByUserIdAndPaidFalseAndDueDateBeforeOrderByDueDateAsc(userId, today);
     }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
+    }
 }
