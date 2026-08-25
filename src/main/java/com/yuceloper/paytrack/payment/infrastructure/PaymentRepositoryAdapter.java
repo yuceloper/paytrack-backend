@@ -29,4 +29,9 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public List<Payment> findDueBetween(Long userId, LocalDate start, LocalDate end) {
         return repository.findAllByUserIdAndDueDateBetweenOrderByDueDateAsc(userId, start, end);
     }
+
+    @Override
+    public List<Payment> findOverdue(Long userId, LocalDate today) {
+        return repository.findAllByUserIdAndPaidFalseAndDueDateBeforeOrderByDueDateAsc(userId, today);
+    }
 }
