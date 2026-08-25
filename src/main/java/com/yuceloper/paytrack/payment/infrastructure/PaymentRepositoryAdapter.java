@@ -36,6 +36,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    public boolean existsByUserIdAndNameAndDueDate(Long userId, String name, LocalDate dueDate) {
+        return repository.existsByUserIdAndNameAndDueDate(userId, name, dueDate);
+    }
+
+    @Override
     public void deleteById(Long id) {
         repository.deleteById(id);
     }
