@@ -43,16 +43,16 @@ public class PaymentController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<PaymentResponse> update(
-            @PathVariable Long id,
-            @Valid @RequestBody PaymentUpsertRequest request
-    ) {
+    public ApiResponse<PaymentResponse> update(@PathVariable Long id, @Valid @RequestBody PaymentUpsertRequest request) {
         return ApiResponse.success(service.update(id, request));
     }
 
     @PatchMapping("/{id}/paid")
-    public ApiResponse<PaymentResponse> markPaid(@PathVariable Long id) {
-        return ApiResponse.success(service.markPaid(id));
+    public ApiResponse<PaymentResponse> markPaid(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long accountId
+    ) {
+        return ApiResponse.success(service.markPaid(id, accountId));
     }
 
     @PatchMapping("/{id}/pending")
