@@ -20,7 +20,7 @@ public class PaymentService {
 
     public List<PaymentResponse> getUpcoming(Long userId, int days) {
         LocalDate start = LocalDate.now();
-        LocalDate end = start.plusDays(days);
+        LocalDate end = start.plusDays(days - 1L);
         return repository.findDueBetween(userId, start, end).stream()
                 .filter(payment -> !payment.isPaid())
                 .map(this::toResponse)
