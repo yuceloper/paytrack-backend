@@ -46,6 +46,13 @@ public class Payment {
 
     private Integer recurrenceDay;
 
+    @Enumerated(EnumType.STRING)
+    private PaymentRecurrenceFrequency recurrenceFrequency;
+
+    private Integer recurrenceInterval;
+
+    private LocalDate recurrenceEndDate;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean paid = false;
