@@ -53,6 +53,37 @@ public class AccountTransactionService {
     }
 
     @Transactional
+    public AccountTransactionDtos.Response manual(AccountTransactionDtos.ManualRequest request) {
+        if (request.type() == AccountTransactionType.TRANSFER) {
+            throw new IllegalArgumentException("Use transfer endpoint for TRANSFER transactions");
+        }
+        Account account = getAccount(request.accountId());
+        validateOwner(request.userId(), account);
+
+        if (request.type() == AccountTransactionType.EXPENSE) {
+            account.setBalance(account.getBalance().subtract(request.amount()));
+        } else if (request.type() == AccountTransactionType.INCOME) {
+            account.setBalance(account.getBalance().add(request.amount()));
+        } else {
+            throw new IllegalArgumentException("Manual transaction type must be INCOME or EXPENSE");
+        }
+        accountRepository.save(account);
+
+        AccountTransaction saved = transactionRepository.save(AccountTransaction.builder()
+                .userId(request.userId())
+                .type(request.type())
+                .accountId(account.getId())
+                .categoryId(request.categoryId())
+                .amount(request.amount())
+                .currency(account.getCurrency())
+                .occurredOn(request.occurredOn() != null ? request.occurredOn() : LocalDate.now())
+                .description(request.description().trim())
+                .sourceType("MANUAL")
+                .build());
+        return toResponse(saved);
+    }
+
+    @Transactional
     public void recordExpense(Long accountId, Long userId, BigDecimal amount, String description, String sourceType, Long sourceId, LocalDate date) {
         if (transactionRepository.findActiveSourceTransaction(sourceType, sourceId, AccountTransactionType.EXPENSE).isPresent()) return;
         Account account = getAccount(accountId);
@@ -119,7 +150,7 @@ public class AccountTransactionService {
     private AccountTransactionDtos.Response toResponse(AccountTransaction tx) {
         return new AccountTransactionDtos.Response(
                 tx.getId(), tx.getUserId(), tx.getType(), tx.getAccountId(), tx.getCounterAccountId(),
-                tx.getAmount(), tx.getCurrency(), tx.getOccurredOn(), tx.getDescription(),
+                tx.getCategoryId(), tx.getAmount(), tx.getCurrency(), tx.getOccurredOn(), tx.getDescription(),
                 tx.getSourceType(), tx.getSourceId(), tx.isReversed()
         );
     }
