@@ -5,9 +5,14 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/paytrack}
     username: ${DB_USERNAME:paytrack}
     password: ${DB_PASSWORD:paytrack}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
     properties:
       hibernate:
