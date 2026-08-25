@@ -21,6 +21,11 @@ public class IncomeOccurrenceRepositoryAdapter implements IncomeOccurrenceReposi
     }
 
     @Override
+    public List<IncomeOccurrence> saveAll(List<IncomeOccurrence> occurrences) {
+        return repository.saveAll(occurrences);
+    }
+
+    @Override
     public Optional<IncomeOccurrence> findById(Long id) {
         return repository.findById(id);
     }
@@ -36,7 +41,22 @@ public class IncomeOccurrenceRepositoryAdapter implements IncomeOccurrenceReposi
     }
 
     @Override
+    public List<IncomeOccurrence> findBySourceId(Long sourceId) {
+        return repository.findAllByIncomeSourceIdOrderByExpectedDateAsc(sourceId);
+    }
+
+    @Override
     public Optional<IncomeOccurrence> findNextPending(Long userId, LocalDate from) {
         return repository.findFirstByUserIdAndReceivedFalseAndExpectedDateGreaterThanEqualOrderByExpectedDateAsc(userId, from);
+    }
+
+    @Override
+    public void delete(IncomeOccurrence occurrence) {
+        repository.delete(occurrence);
+    }
+
+    @Override
+    public void deleteAll(List<IncomeOccurrence> occurrences) {
+        repository.deleteAll(occurrences);
     }
 }
