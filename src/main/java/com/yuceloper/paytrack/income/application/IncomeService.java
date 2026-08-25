@@ -34,10 +34,10 @@ public class IncomeService {
     }
 
     @Transactional
-    public IncomeResponses.Source createSource(IncomeSourceRequest request) {
+    public IncomeResponses.Source createSource(Long userId, IncomeSourceRequest request) {
         validateRequest(request);
         IncomeSource source = sourceRepository.save(IncomeSource.builder()
-                .userId(request.userId()).name(request.name()).type(request.type()).amount(request.amount())
+                .userId(userId).name(request.name()).type(request.type()).amount(request.amount())
                 .currency(request.currency().trim().toUpperCase()).frequency(request.frequency())
                 .recurrenceDay(resolveRecurrenceDay(request)).recurrenceInterval(resolveInterval(request))
                 .recurrenceEndDate(request.recurrenceEndDate()).nextIncomeDate(request.nextIncomeDate())
@@ -48,16 +48,17 @@ public class IncomeService {
 
     @Transactional
     public IncomeResponses.Occurrence updateOccurrence(
+            Long userId,
             Long occurrenceId,
             IncomeOccurrenceUpdateRequest request,
             IncomeSeriesScope scope
     ) {
-        IncomeOccurrence current = getOccurrence(occurrenceId);
+        IncomeOccurrence current = getOccurrence(userId, occurrenceId);
         if (current.isReceived()) {
             throw new IllegalArgumentException("Received income occurrences cannot be edited");
         }
 
-        IncomeSource source = getSource(current.getIncomeSourceId());
+        IncomeSource source = getSource(userId, current.getIncomeSourceId());
         validateOccurrenceUpdate(request);
 
         if (scope == IncomeSeriesScope.THIS) {
@@ -67,6 +68,7 @@ public class IncomeService {
 
         applySource(source, request);
         List<IncomeOccurrence> targets = occurrenceRepository.findBySourceId(source.getId()).stream()
+                .filter(item -> userId.equals(item.getUserId()))
                 .filter(item -> !item.isReceived())
                 .filter(item -> scope == IncomeSeriesScope.ALL || !item.getExpectedDate().isBefore(current.getExpectedDate()))
                 .sorted(Comparator.comparing(IncomeOccurrence::getExpectedDate))
@@ -92,13 +94,13 @@ public class IncomeService {
     }
 
     @Transactional
-    public void deleteOccurrence(Long occurrenceId, IncomeSeriesScope scope) {
-        IncomeOccurrence current = getOccurrence(occurrenceId);
+    public void deleteOccurrence(Long userId, Long occurrenceId, IncomeSeriesScope scope) {
+        IncomeOccurrence current = getOccurrence(userId, occurrenceId);
         if (current.isReceived()) {
             throw new IllegalArgumentException("Received income occurrences cannot be deleted");
         }
 
-        IncomeSource source = getSource(current.getIncomeSourceId());
+        IncomeSource source = getSource(userId, current.getIncomeSourceId());
         if (scope == IncomeSeriesScope.THIS) {
             occurrenceRepository.delete(current);
             if (source.getFrequency() == IncomeFrequency.ONE_TIME) {
@@ -117,6 +119,7 @@ public class IncomeService {
         }
 
         List<IncomeOccurrence> targets = occurrenceRepository.findBySourceId(source.getId()).stream()
+                .filter(item -> userId.equals(item.getUserId()))
                 .filter(item -> !item.isReceived())
                 .filter(item -> scope == IncomeSeriesScope.ALL || !item.getExpectedDate().isBefore(current.getExpectedDate()))
                 .toList();
@@ -126,20 +129,20 @@ public class IncomeService {
     }
 
     @Transactional
-    public IncomeResponses.Occurrence markReceived(Long occurrenceId, Long accountId) {
-        IncomeOccurrence occurrence = getOccurrence(occurrenceId);
+    public IncomeResponses.Occurrence markReceived(Long userId, Long occurrenceId, Long accountId) {
+        IncomeOccurrence occurrence = getOccurrence(userId, occurrenceId);
         boolean wasReceived = occurrence.isReceived();
         if (!wasReceived) occurrence.markReceived();
         occurrenceRepository.save(occurrence);
 
         if (!wasReceived && accountId != null) {
             accountTransactionService.recordIncome(
-                    accountId, occurrence.getUserId(), occurrence.getAmount(), occurrence.getName(),
+                    accountId, userId, occurrence.getAmount(), occurrence.getName(),
                     "INCOME_OCCURRENCE", occurrence.getId(), LocalDate.now()
             );
         }
 
-        IncomeSource source = getSource(occurrence.getIncomeSourceId());
+        IncomeSource source = getSource(userId, occurrence.getIncomeSourceId());
         if (source.isActive() && source.getFrequency() != IncomeFrequency.ONE_TIME) {
             LocalDate nextDate = nextDate(source, occurrence.getExpectedDate());
             if (source.getRecurrenceEndDate() != null && nextDate.isAfter(source.getRecurrenceEndDate())) {
@@ -155,21 +158,29 @@ public class IncomeService {
     }
 
     @Transactional
-    public IncomeResponses.Occurrence markPending(Long occurrenceId) {
-        IncomeOccurrence occurrence = getOccurrence(occurrenceId);
+    public IncomeResponses.Occurrence markPending(Long userId, Long occurrenceId) {
+        IncomeOccurrence occurrence = getOccurrence(userId, occurrenceId);
         if (occurrence.isReceived()) accountTransactionService.reverseIncome("INCOME_OCCURRENCE", occurrence.getId());
         occurrence.markPending();
         return toOccurrence(occurrenceRepository.save(occurrence));
     }
 
-    private IncomeOccurrence getOccurrence(Long id) {
-        return occurrenceRepository.findById(id)
+    private IncomeOccurrence getOccurrence(Long userId, Long id) {
+        IncomeOccurrence occurrence = occurrenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Income occurrence not found: " + id));
+        if (!userId.equals(occurrence.getUserId())) {
+            throw new ResourceNotFoundException("Income occurrence not found: " + id);
+        }
+        return occurrence;
     }
 
-    private IncomeSource getSource(Long id) {
-        return sourceRepository.findById(id)
+    private IncomeSource getSource(Long userId, Long id) {
+        IncomeSource source = sourceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Income source not found: " + id));
+        if (!userId.equals(source.getUserId())) {
+            throw new ResourceNotFoundException("Income source not found: " + id);
+        }
+        return source;
     }
 
     private void applyOccurrence(IncomeOccurrence occurrence, String name, java.math.BigDecimal amount, LocalDate expectedDate) {
