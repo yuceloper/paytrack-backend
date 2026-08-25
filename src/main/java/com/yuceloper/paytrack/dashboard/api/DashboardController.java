@@ -1,11 +1,11 @@
 package com.yuceloper.paytrack.dashboard.api;
 
+import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.dashboard.application.DashboardService;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
@@ -18,7 +18,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/summary")
-    public ApiResponse<DashboardSummaryResponse> getSummary(@RequestParam Long userId) {
-        return ApiResponse.success(dashboardService.getSummary(userId, LocalDate.now()));
+    public ApiResponse<DashboardSummaryResponse> getSummary() {
+        return ApiResponse.success(dashboardService.getSummary(AuthenticatedUser.id(), LocalDate.now()));
     }
 }
