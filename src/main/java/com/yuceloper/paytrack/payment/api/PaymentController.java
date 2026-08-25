@@ -6,8 +6,10 @@ import com.yuceloper.paytrack.payment.application.PaymentService;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -16,6 +18,15 @@ import java.util.List;
 public class PaymentController {
 
     private final PaymentService service;
+
+    @GetMapping
+    public ApiResponse<List<PaymentResponse>> getRange(
+            @RequestParam Long userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ApiResponse.success(service.getRange(userId, from, to));
+    }
 
     @GetMapping("/upcoming")
     public ApiResponse<List<PaymentResponse>> getUpcoming(
