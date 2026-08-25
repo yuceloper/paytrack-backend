@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record IncomeSourceRequest(
-        @NotNull Long userId,
         @NotBlank String name,
         @NotNull IncomeType type,
         @NotNull @Positive BigDecimal amount,
