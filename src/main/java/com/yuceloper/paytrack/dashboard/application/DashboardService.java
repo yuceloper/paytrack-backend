@@ -136,9 +136,6 @@ public class DashboardService {
     }
 
     private BigDecimal loanOutstandingDebt(Loan loan) {
-        if (loan.getRemainingPrincipal() != null) {
-            return loan.getRemainingPrincipal().max(BigDecimal.ZERO);
-        }
         if (loan.getInstallmentAmount() == null || loan.getRemainingInstallments() == null) {
             return BigDecimal.ZERO;
         }
