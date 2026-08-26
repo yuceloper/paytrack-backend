@@ -59,6 +59,28 @@ public class LoanService {
     }
 
     @Transactional
+    public void installmentPaid(Long userId, Payment payment) {
+        Loan loan = linkedLoan(userId, payment);
+        if (loan == null) return;
+
+        int remaining = Math.max(loan.getRemainingInstallments() - 1, 0);
+        loan.setRemainingInstallments(remaining);
+        loan.setActive(remaining > 0);
+        repository.save(loan);
+    }
+
+    @Transactional
+    public void installmentReverted(Long userId, Payment payment) {
+        Loan loan = linkedLoan(userId, payment);
+        if (loan == null) return;
+
+        int remaining = Math.min(loan.getRemainingInstallments() + 1, loan.getTotalInstallments());
+        loan.setRemainingInstallments(remaining);
+        loan.setActive(remaining > 0);
+        repository.save(loan);
+    }
+
+    @Transactional
     public void delete(Long userId, Long id) {
         Loan loan = getEntity(userId, id);
         List<Payment> installments = paymentRepository.findBySeriesId(seriesId(loan.getId()));
@@ -67,6 +89,13 @@ public class LoanService {
         }
         paymentRepository.deleteAll(installments);
         repository.deleteById(id);
+    }
+
+    private Loan linkedLoan(Long userId, Payment payment) {
+        if (payment.getSourceType() != PaymentSourceType.LOAN || payment.getSourceId() == null) {
+            return null;
+        }
+        return getEntity(userId, payment.getSourceId());
     }
 
     private void createRemainingInstallmentPayments(Loan loan) {
