@@ -11,9 +11,7 @@ public record CreateLoanRequest(
         @NotNull @Positive BigDecimal installmentAmount,
         @NotNull @Min(1) @Max(31) Integer paymentDay,
         @NotNull @Positive Integer totalInstallments,
-        @NotNull @PositiveOrZero Integer remainingInstallments,
-        @PositiveOrZero BigDecimal remainingPrincipal,
-        LocalDate startDate,
-        LocalDate endDate
+        @PositiveOrZero Integer paidInstallments,
+        @NotNull LocalDate startDate
 ) {
 }
