@@ -79,16 +79,20 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse markPaid(Long userId, Long id, Long accountId) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("accountId is required to mark a payment as paid");
+        }
+
         Payment payment = getEntity(userId, id);
         boolean wasPaid = payment.isPaid();
-        payment.markPaid();
-        Payment saved = repository.save(payment);
-        if (!wasPaid && accountId != null) {
+        if (!wasPaid) {
             accountTransactionService.recordExpense(
-                    accountId, userId, saved.getAmount(), saved.getName(),
-                    "PAYMENT", saved.getId(), LocalDate.now()
+                    accountId, userId, payment.getAmount(), payment.getName(),
+                    "PAYMENT", payment.getId(), LocalDate.now()
             );
+            payment.markPaid();
         }
+        Payment saved = repository.save(payment);
         recurrenceService.createNextOccurrenceIfNeeded(saved);
         return toResponse(saved);
     }
