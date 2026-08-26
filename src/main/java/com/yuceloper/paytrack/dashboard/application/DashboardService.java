@@ -1,10 +1,15 @@
 package com.yuceloper.paytrack.dashboard.application;
 
+import com.yuceloper.paytrack.account.application.AccountRepository;
+import com.yuceloper.paytrack.account.domain.Account;
+import com.yuceloper.paytrack.account.domain.AccountNature;
 import com.yuceloper.paytrack.creditcard.application.CreditCardRepository;
 import com.yuceloper.paytrack.creditcard.domain.CreditCard;
 import com.yuceloper.paytrack.dashboard.api.DashboardSummaryResponse;
 import com.yuceloper.paytrack.income.application.IncomeOccurrenceRepository;
 import com.yuceloper.paytrack.income.domain.IncomeOccurrence;
+import com.yuceloper.paytrack.loan.application.LoanRepository;
+import com.yuceloper.paytrack.loan.domain.Loan;
 import com.yuceloper.paytrack.payment.application.PaymentRepository;
 import com.yuceloper.paytrack.payment.domain.Payment;
 import com.yuceloper.paytrack.subscription.application.SubscriptionRepository;
@@ -30,7 +35,9 @@ public class DashboardService {
     private static final BigDecimal DAYS_PER_YEAR = BigDecimal.valueOf(365);
 
     private final PaymentRepository paymentRepository;
+    private final AccountRepository accountRepository;
     private final CreditCardRepository creditCardRepository;
+    private final LoanRepository loanRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final IncomeOccurrenceRepository incomeOccurrenceRepository;
 
@@ -48,11 +55,36 @@ public class DashboardService {
         int upcomingPaymentCount = (int) nextSevenDays.stream().filter(payment -> !payment.isPaid()).count();
         BigDecimal overdueAmount = sumPending(overduePayments);
 
+        List<Account> activeTryAccounts = accountRepository.findAllByUserId(userId).stream()
+                .filter(Account::isActive)
+                .filter(account -> isTryCurrency(account.getCurrency()))
+                .toList();
+
+        BigDecimal totalAssets = activeTryAccounts.stream()
+                .filter(account -> account.getNature() != AccountNature.LIABILITY)
+                .map(Account::getBalance)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal overdraftDebt = activeTryAccounts.stream()
+                .filter(account -> account.getNature() == AccountNature.LIABILITY)
+                .map(Account::getBalance)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         BigDecimal totalCreditCardDebt = creditCardRepository.findAllByUserId(userId).stream()
                 .filter(CreditCard::isActive)
                 .map(CreditCard::getCurrentDebt)
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalLoanDebt = loanRepository.findAllByUserId(userId).stream()
+                .filter(Loan::isActive)
+                .map(this::loanOutstandingDebt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalLiabilities = overdraftDebt.add(totalCreditCardDebt).add(totalLoanDebt);
+        BigDecimal netWorth = totalAssets.subtract(totalLiabilities);
 
         BigDecimal monthlySubscriptionCost = subscriptionRepository.findAllByUserId(userId).stream()
                 .filter(Subscription::isActive)
@@ -85,7 +117,12 @@ public class DashboardService {
                 upcomingPaymentCount,
                 overdueAmount,
                 overduePayments.size(),
+                totalAssets,
+                overdraftDebt,
                 totalCreditCardDebt,
+                totalLoanDebt,
+                totalLiabilities,
+                netWorth,
                 monthlySubscriptionCost,
                 yearlySubscriptionCost,
                 expectedIncomeThisMonth,
@@ -96,6 +133,17 @@ public class DashboardService {
                 nextIncome.map(IncomeOccurrence::getAmount).orElse(null),
                 requiredUntilNextIncome
         );
+    }
+
+    private BigDecimal loanOutstandingDebt(Loan loan) {
+        if (loan.getRemainingPrincipal() != null) {
+            return loan.getRemainingPrincipal().max(BigDecimal.ZERO);
+        }
+        if (loan.getInstallmentAmount() == null || loan.getRemainingInstallments() == null) {
+            return BigDecimal.ZERO;
+        }
+        return loan.getInstallmentAmount()
+                .multiply(BigDecimal.valueOf(Math.max(loan.getRemainingInstallments(), 0)));
     }
 
     private BigDecimal sumPending(List<Payment> payments) {
