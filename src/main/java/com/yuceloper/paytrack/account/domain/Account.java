@@ -28,10 +28,18 @@ public class Account {
     @Column(nullable = false)
     private AccountType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private AccountNature nature = AccountNature.ASSET;
+
     private String institution;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal creditLimit;
 
     @Column(nullable = false, length = 3)
     @Builder.Default
