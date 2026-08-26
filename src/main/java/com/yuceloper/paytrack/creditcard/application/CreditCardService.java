@@ -24,20 +24,27 @@ public class CreditCardService {
                 .toList();
     }
 
-    public CreditCardResponse getById(Long id) {
-        return toResponse(getEntity(id));
+    public CreditCardResponse getById(Long userId, Long id) {
+        return toResponse(getEntity(userId, id));
     }
 
     @Transactional
-    public CreditCardResponse create(CreateCreditCardRequest request) {
+    public CreditCardResponse create(Long userId, CreateCreditCardRequest request) {
+        BigDecimal creditLimit = request.creditLimit();
+        BigDecimal currentDebt = defaultMoney(request.currentDebt());
+        if (creditLimit != null && currentDebt.compareTo(creditLimit) > 0) {
+            throw new IllegalArgumentException("Current debt cannot exceed credit limit");
+        }
+
         CreditCard card = CreditCard.builder()
-                .userId(request.userId())
-                .name(request.name())
-                .bankName(request.bankName())
+                .userId(userId)
+                .name(request.name().trim())
+                .bankName(request.bankName().trim())
                 .lastFourDigits(request.lastFourDigits())
                 .statementDay(request.statementDay())
                 .dueDay(request.dueDay())
-                .currentDebt(defaultMoney(request.currentDebt()))
+                .creditLimit(creditLimit)
+                .currentDebt(currentDebt)
                 .minimumPayment(defaultMoney(request.minimumPayment()))
                 .active(true)
                 .build();
@@ -46,14 +53,18 @@ public class CreditCardService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        getEntity(id);
+    public void delete(Long userId, Long id) {
+        getEntity(userId, id);
         repository.deleteById(id);
     }
 
-    private CreditCard getEntity(Long id) {
-        return repository.findById(id)
+    private CreditCard getEntity(Long userId, Long id) {
+        CreditCard card = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CreditCard", id));
+        if (!userId.equals(card.getUserId())) {
+            throw new ResourceNotFoundException("CreditCard", id);
+        }
+        return card;
     }
 
     private BigDecimal defaultMoney(BigDecimal value) {
@@ -61,6 +72,9 @@ public class CreditCardService {
     }
 
     private CreditCardResponse toResponse(CreditCard card) {
+        BigDecimal availableLimit = card.getCreditLimit() == null
+                ? null
+                : card.getCreditLimit().subtract(card.getCurrentDebt());
         return new CreditCardResponse(
                 card.getId(),
                 card.getUserId(),
@@ -69,7 +83,9 @@ public class CreditCardService {
                 card.getLastFourDigits(),
                 card.getStatementDay(),
                 card.getDueDay(),
+                card.getCreditLimit(),
                 card.getCurrentDebt(),
+                availableLimit,
                 card.getMinimumPayment(),
                 card.isActive()
         );
