@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record CreateLoanRequest(
-        @NotNull Long userId,
         @NotBlank String name,
         @NotBlank String institutionName,
         @NotNull @Positive BigDecimal installmentAmount,
