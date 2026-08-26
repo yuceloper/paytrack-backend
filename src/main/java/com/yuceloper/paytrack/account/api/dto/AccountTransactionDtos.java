@@ -28,6 +28,13 @@ public final class AccountTransactionDtos {
             LocalDate occurredOn
     ) {}
 
+    public record BalanceAdjustmentRequest(
+            @NotNull Long accountId,
+            @NotNull BigDecimal targetBalance,
+            @NotBlank String description,
+            LocalDate occurredOn
+    ) {}
+
     public record Response(
             Long id,
             Long userId,
