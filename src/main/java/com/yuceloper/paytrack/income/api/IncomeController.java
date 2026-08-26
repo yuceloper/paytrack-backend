@@ -62,7 +62,7 @@ public class IncomeController {
     @PatchMapping("/occurrences/{id}/received")
     public ApiResponse<IncomeResponses.Occurrence> markReceived(
             @PathVariable Long id,
-            @RequestParam(required = false) Long accountId
+            @RequestParam Long accountId
     ) {
         return ApiResponse.success(service.markReceived(AuthenticatedUser.id(), id, accountId));
     }
