@@ -6,6 +6,7 @@ import com.yuceloper.paytrack.user.domain.AuthProvider;
 import com.yuceloper.paytrack.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ public class AuthService {
     private final RefreshTokenJpaRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final GoogleIdentityVerifier googleIdentityVerifier;
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${paytrack.auth.refresh-token-days:180}")
     private long refreshTokenDays;
@@ -57,7 +59,8 @@ public class AuthService {
         }
 
         User user = userRepository.findById(stored.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .filter(User::isActive)
+                .orElseThrow(() -> new IllegalArgumentException("User not found or inactive"));
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);
         return issueSession(user);
@@ -66,16 +69,34 @@ public class AuthService {
     @Transactional
     public AuthDtos.SessionResponse linkGoogle(Long currentUserId, String idToken) {
         User current = userRepository.findById(currentUserId)
+                .filter(User::isActive)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         GoogleIdentityVerifier.GoogleIdentity identity = googleIdentityVerifier.verify(idToken);
 
         var linkedBySubject = userRepository.findByAuthProviderAndProviderSubject(AuthProvider.GOOGLE, identity.subject());
         if (linkedBySubject.isPresent() && !linkedBySubject.get().getId().equals(current.getId())) {
-            throw new IllegalArgumentException("This Google account is already linked to another PayTrack account");
+            if (current.getAuthProvider() != AuthProvider.GUEST) {
+                throw new IllegalArgumentException("This Google account is already linked to another PayTrack account");
+            }
+
+            User existingGoogleUser = linkedBySubject.get();
+            if (!existingGoogleUser.isActive()) {
+                throw new IllegalArgumentException("Linked Google account is inactive");
+            }
+
+            mergeGuestIntoUser(current, existingGoogleUser);
+            return issueSession(existingGoogleUser);
         }
 
         var linkedByEmail = userRepository.findByEmailIgnoreCase(identity.email());
         if (linkedByEmail.isPresent() && !linkedByEmail.get().getId().equals(current.getId())) {
+            User existing = linkedByEmail.get();
+            if (current.getAuthProvider() == AuthProvider.GUEST
+                    && existing.isActive()
+                    && existing.getAuthProvider() == AuthProvider.GOOGLE) {
+                mergeGuestIntoUser(current, existing);
+                return issueSession(existing);
+            }
             throw new IllegalArgumentException("This email is already used by another PayTrack account");
         }
 
@@ -87,6 +108,52 @@ public class AuthService {
         }
         userRepository.save(current);
         return issueSession(current);
+    }
+
+    private void mergeGuestIntoUser(User guest, User target) {
+        Long guestId = guest.getId();
+        Long targetId = target.getId();
+
+        // Categories have a (user_id, name) unique key. Reuse an existing target category
+        // before moving the rest so transaction references stay valid and no duplicate key occurs.
+        jdbcTemplate.update("""
+                UPDATE account_transactions tx
+                   SET category_id = target_category.id
+                  FROM transaction_categories guest_category
+                  JOIN transaction_categories target_category
+                    ON target_category.user_id = ?
+                   AND target_category.name = guest_category.name
+                 WHERE guest_category.user_id = ?
+                   AND tx.category_id = guest_category.id
+                """, targetId, guestId);
+
+        jdbcTemplate.update("""
+                DELETE FROM transaction_categories guest_category
+                 USING transaction_categories target_category
+                 WHERE guest_category.user_id = ?
+                   AND target_category.user_id = ?
+                   AND target_category.name = guest_category.name
+                """, guestId, targetId);
+
+        moveUserOwnedRows("credit_cards", guestId, targetId);
+        moveUserOwnedRows("loans", guestId, targetId);
+        moveUserOwnedRows("subscriptions", guestId, targetId);
+        moveUserOwnedRows("bills", guestId, targetId);
+        moveUserOwnedRows("accounts", guestId, targetId);
+        moveUserOwnedRows("transaction_categories", guestId, targetId);
+        moveUserOwnedRows("payments", guestId, targetId);
+        moveUserOwnedRows("income_sources", guestId, targetId);
+        moveUserOwnedRows("income_occurrences", guestId, targetId);
+        moveUserOwnedRows("account_transactions", guestId, targetId);
+
+        // Any token belonging to the temporary device user must stop working after the merge.
+        jdbcTemplate.update("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?", guestId);
+        guest.setActive(false);
+        userRepository.save(guest);
+    }
+
+    private void moveUserOwnedRows(String tableName, Long fromUserId, Long toUserId) {
+        jdbcTemplate.update("UPDATE " + tableName + " SET user_id = ? WHERE user_id = ?", toUserId, fromUserId);
     }
 
     private AuthDtos.SessionResponse issueSession(User user) {
