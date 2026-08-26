@@ -81,6 +81,20 @@ public class AuthService {
     }
 
     @Transactional
+    public void logout(Long currentUserId, String rawRefreshToken) {
+        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            return;
+        }
+
+        refreshTokenRepository.findByTokenHashAndRevokedFalse(hash(rawRefreshToken))
+                .filter(token -> token.getUserId().equals(currentUserId))
+                .ifPresent(token -> {
+                    token.setRevoked(true);
+                    refreshTokenRepository.save(token);
+                });
+    }
+
+    @Transactional
     public AuthDtos.SessionResponse linkGoogle(Long currentUserId, String idToken) {
         User current = userRepository.findById(currentUserId)
                 .filter(User::isActive)
