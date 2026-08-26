@@ -54,7 +54,7 @@ public class PaymentController {
     @PatchMapping("/{id}/paid")
     public ApiResponse<PaymentResponse> markPaid(
             @PathVariable Long id,
-            @RequestParam(required = false) Long accountId
+            @RequestParam Long accountId
     ) {
         return ApiResponse.success(service.markPaid(AuthenticatedUser.id(), id, accountId));
     }
