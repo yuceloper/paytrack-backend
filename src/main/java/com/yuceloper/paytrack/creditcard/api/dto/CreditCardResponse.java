@@ -10,7 +10,9 @@ public record CreditCardResponse(
         String lastFourDigits,
         Integer statementDay,
         Integer dueDay,
+        BigDecimal creditLimit,
         BigDecimal currentDebt,
+        BigDecimal availableLimit,
         BigDecimal minimumPayment,
         boolean active
 ) {
