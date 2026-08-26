@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -25,7 +24,6 @@ public class LoanService {
 
     private final LoanRepository repository;
     private final PaymentRepository paymentRepository;
-    private final Clock clock;
 
     public List<LoanResponse> getByUserId(Long userId) {
         return repository.findAllByUserId(userId).stream().map(this::toResponse).toList();
@@ -76,7 +74,7 @@ public class LoanService {
         if (remaining <= 0) return;
 
         int alreadyPaid = loan.getTotalInstallments() - remaining;
-        LocalDate anchor = LocalDate.now(clock);
+        LocalDate anchor = LocalDate.now();
         if (loan.getStartDate() != null && loan.getStartDate().isAfter(anchor)) {
             anchor = loan.getStartDate();
         }
