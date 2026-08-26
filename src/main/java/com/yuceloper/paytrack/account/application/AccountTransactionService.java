@@ -89,6 +89,36 @@ public class AccountTransactionService {
     }
 
     @Transactional
+    public AccountTransactionDtos.Response adjustBalance(Long userId, AccountTransactionDtos.BalanceAdjustmentRequest request) {
+        Account account = getAccount(request.accountId());
+        validateOwner(userId, account);
+
+        BigDecimal delta = request.targetBalance().subtract(account.getBalance());
+        if (delta.signum() == 0) {
+            throw new IllegalArgumentException("Target balance is already the current balance");
+        }
+
+        AccountTransactionType type = delta.signum() > 0
+                ? AccountTransactionType.INCOME
+                : AccountTransactionType.EXPENSE;
+        BigDecimal amount = delta.abs();
+        account.setBalance(request.targetBalance());
+        accountRepository.save(account);
+
+        AccountTransaction saved = transactionRepository.save(AccountTransaction.builder()
+                .userId(userId)
+                .type(type)
+                .accountId(account.getId())
+                .amount(amount)
+                .currency(account.getCurrency())
+                .occurredOn(request.occurredOn() != null ? request.occurredOn() : LocalDate.now())
+                .description(request.description().trim())
+                .sourceType("BALANCE_ADJUSTMENT")
+                .build());
+        return toResponse(saved);
+    }
+
+    @Transactional
     public void recordExpense(Long accountId, Long userId, BigDecimal amount, String description, String sourceType, Long sourceId, LocalDate date) {
         if (transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.EXPENSE).isPresent()) return;
         Account account = getAccount(accountId);
