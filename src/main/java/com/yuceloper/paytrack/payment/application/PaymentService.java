@@ -1,6 +1,7 @@
 package com.yuceloper.paytrack.payment.application;
 
 import com.yuceloper.paytrack.account.application.AccountTransactionService;
+import com.yuceloper.paytrack.loan.application.LoanService;
 import com.yuceloper.paytrack.payment.api.dto.PaymentResponse;
 import com.yuceloper.paytrack.payment.api.dto.PaymentUpsertRequest;
 import com.yuceloper.paytrack.payment.domain.Payment;
@@ -23,6 +24,7 @@ public class PaymentService {
     private final PaymentRepository repository;
     private final PaymentRecurrenceService recurrenceService;
     private final AccountTransactionService accountTransactionService;
+    private final LoanService loanService;
 
     public List<PaymentResponse> getUpcoming(Long userId, int days) {
         LocalDate start = LocalDate.now();
@@ -91,6 +93,7 @@ public class PaymentService {
                     "PAYMENT", payment.getId(), LocalDate.now()
             );
             payment.markPaid();
+            loanService.installmentPaid(userId, payment);
         }
         Payment saved = repository.save(payment);
         recurrenceService.createNextOccurrenceIfNeeded(saved);
@@ -100,8 +103,11 @@ public class PaymentService {
     @Transactional
     public PaymentResponse markPending(Long userId, Long id) {
         Payment payment = getEntity(userId, id);
-        if (payment.isPaid()) accountTransactionService.reverseExpense(userId, "PAYMENT", payment.getId());
-        payment.markPending();
+        if (payment.isPaid()) {
+            accountTransactionService.reverseExpense(userId, "PAYMENT", payment.getId());
+            payment.markPending();
+            loanService.installmentReverted(userId, payment);
+        }
         return toResponse(repository.save(payment));
     }
 
