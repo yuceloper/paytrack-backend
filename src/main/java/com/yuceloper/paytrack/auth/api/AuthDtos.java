@@ -11,6 +11,14 @@ public class AuthDtos {
             boolean guest
     ) {}
 
+    public record AccountProfileResponse(
+            Long userId,
+            String name,
+            String email,
+            String provider,
+            boolean guest
+    ) {}
+
     public record RefreshRequest(String refreshToken) {}
 
     public record GoogleLinkRequest(String idToken) {}
