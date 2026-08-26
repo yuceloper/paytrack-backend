@@ -39,10 +39,12 @@ public class AccountService {
     @Transactional
     public AccountResponse update(Long userId, Long id, AccountUpsertRequest request) {
         Account account = getEntity(userId, id);
+        if (request.balance().compareTo(account.getBalance()) != 0) {
+            throw new IllegalArgumentException("Balance cannot be edited directly; use a balance adjustment transaction");
+        }
         account.setName(request.name().trim());
         account.setType(request.type());
         account.setInstitution(trimToNull(request.institution()));
-        account.setBalance(request.balance());
         account.setCurrency(request.currency().trim().toUpperCase(Locale.ROOT));
         if (request.active() != null) account.setActive(request.active());
         return toResponse(repository.save(account));
