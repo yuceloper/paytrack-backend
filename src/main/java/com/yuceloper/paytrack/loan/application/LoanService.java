@@ -3,11 +3,19 @@ package com.yuceloper.paytrack.loan.application;
 import com.yuceloper.paytrack.loan.api.dto.CreateLoanRequest;
 import com.yuceloper.paytrack.loan.api.dto.LoanResponse;
 import com.yuceloper.paytrack.loan.domain.Loan;
+import com.yuceloper.paytrack.payment.application.PaymentRepository;
+import com.yuceloper.paytrack.payment.domain.Payment;
+import com.yuceloper.paytrack.payment.domain.PaymentSourceType;
+import com.yuceloper.paytrack.payment.domain.PaymentType;
 import com.yuceloper.paytrack.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -16,25 +24,27 @@ import java.util.List;
 public class LoanService {
 
     private final LoanRepository repository;
+    private final PaymentRepository paymentRepository;
+    private final Clock clock;
 
     public List<LoanResponse> getByUserId(Long userId) {
         return repository.findAllByUserId(userId).stream().map(this::toResponse).toList();
     }
 
-    public LoanResponse getById(Long id) {
-        return toResponse(getEntity(id));
+    public LoanResponse getById(Long userId, Long id) {
+        return toResponse(getEntity(userId, id));
     }
 
     @Transactional
-    public LoanResponse create(CreateLoanRequest request) {
+    public LoanResponse create(Long userId, CreateLoanRequest request) {
         if (request.remainingInstallments() > request.totalInstallments()) {
             throw new IllegalArgumentException("remainingInstallments cannot exceed totalInstallments");
         }
 
         Loan loan = Loan.builder()
-                .userId(request.userId())
-                .name(request.name())
-                .institutionName(request.institutionName())
+                .userId(userId)
+                .name(request.name().trim())
+                .institutionName(request.institutionName().trim())
                 .installmentAmount(request.installmentAmount())
                 .paymentDay(request.paymentDay())
                 .totalInstallments(request.totalInstallments())
@@ -42,20 +52,84 @@ public class LoanService {
                 .remainingPrincipal(request.remainingPrincipal())
                 .startDate(request.startDate())
                 .endDate(request.endDate())
-                .active(true)
+                .active(request.remainingInstallments() > 0)
                 .build();
 
-        return toResponse(repository.save(loan));
+        Loan saved = repository.save(loan);
+        createRemainingInstallmentPayments(saved);
+        return toResponse(saved);
     }
 
     @Transactional
-    public void delete(Long id) {
-        getEntity(id);
+    public void delete(Long userId, Long id) {
+        Loan loan = getEntity(userId, id);
+        List<Payment> installments = paymentRepository.findBySeriesId(seriesId(loan.getId()));
+        if (installments.stream().anyMatch(Payment::isPaid)) {
+            throw new IllegalArgumentException("A loan with paid installments cannot be deleted");
+        }
+        paymentRepository.deleteAll(installments);
         repository.deleteById(id);
     }
 
-    private Loan getEntity(Long id) {
-        return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Loan", id));
+    private void createRemainingInstallmentPayments(Loan loan) {
+        int remaining = loan.getRemainingInstallments();
+        if (remaining <= 0) return;
+
+        int alreadyPaid = loan.getTotalInstallments() - remaining;
+        LocalDate anchor = LocalDate.now(clock);
+        if (loan.getStartDate() != null && loan.getStartDate().isAfter(anchor)) {
+            anchor = loan.getStartDate();
+        }
+
+        LocalDate firstDueDate = nextPaymentDate(anchor, loan.getPaymentDay());
+        List<Payment> payments = new ArrayList<>(remaining);
+
+        for (int i = 0; i < remaining; i++) {
+            int installmentNo = alreadyPaid + i + 1;
+            LocalDate dueDate = paymentDate(firstDueDate.plusMonths(i), loan.getPaymentDay());
+            payments.add(Payment.builder()
+                    .userId(loan.getUserId())
+                    .name(loan.getName() + " taksit " + installmentNo + "/" + loan.getTotalInstallments())
+                    .type(PaymentType.LOAN)
+                    .sourceType(PaymentSourceType.LOAN)
+                    .sourceId(loan.getId())
+                    .amount(loan.getInstallmentAmount())
+                    .dueDate(dueDate)
+                    .recurring(false)
+                    .seriesId(seriesId(loan.getId()))
+                    .paid(false)
+                    .institution(loan.getInstitutionName())
+                    .note("Kredi taksiti")
+                    .build());
+        }
+
+        paymentRepository.saveAll(payments);
+    }
+
+    private LocalDate nextPaymentDate(LocalDate anchor, int paymentDay) {
+        LocalDate candidate = paymentDate(anchor, paymentDay);
+        if (candidate.isBefore(anchor)) {
+            candidate = paymentDate(anchor.plusMonths(1), paymentDay);
+        }
+        return candidate;
+    }
+
+    private LocalDate paymentDate(LocalDate date, int paymentDay) {
+        YearMonth month = YearMonth.from(date);
+        return month.atDay(Math.min(paymentDay, month.lengthOfMonth()));
+    }
+
+    private String seriesId(Long loanId) {
+        return "loan:" + loanId;
+    }
+
+    private Loan getEntity(Long userId, Long id) {
+        Loan loan = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Loan", id));
+        if (!loan.getUserId().equals(userId)) {
+            throw new ResourceNotFoundException("Loan", id);
+        }
+        return loan;
     }
 
     private LoanResponse toResponse(Loan loan) {
