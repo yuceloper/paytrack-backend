@@ -90,7 +90,7 @@ public class AccountTransactionService {
 
     @Transactional
     public void recordExpense(Long accountId, Long userId, BigDecimal amount, String description, String sourceType, Long sourceId, LocalDate date) {
-        if (transactionRepository.findActiveSourceTransaction(sourceType, sourceId, AccountTransactionType.EXPENSE).isPresent()) return;
+        if (transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.EXPENSE).isPresent()) return;
         Account account = getAccount(accountId);
         validateOwner(userId, account);
         account.setBalance(account.getBalance().subtract(amount));
@@ -103,7 +103,7 @@ public class AccountTransactionService {
 
     @Transactional
     public void recordIncome(Long accountId, Long userId, BigDecimal amount, String description, String sourceType, Long sourceId, LocalDate date) {
-        if (transactionRepository.findActiveSourceTransaction(sourceType, sourceId, AccountTransactionType.INCOME).isPresent()) return;
+        if (transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.INCOME).isPresent()) return;
         Account account = getAccount(accountId);
         validateOwner(userId, account);
         account.setBalance(account.getBalance().add(amount));
@@ -115,9 +115,10 @@ public class AccountTransactionService {
     }
 
     @Transactional
-    public void reverseExpense(String sourceType, Long sourceId) {
-        transactionRepository.findActiveSourceTransaction(sourceType, sourceId, AccountTransactionType.EXPENSE).ifPresent(tx -> {
+    public void reverseExpense(Long userId, String sourceType, Long sourceId) {
+        transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.EXPENSE).ifPresent(tx -> {
             Account account = getAccount(tx.getAccountId());
+            validateOwner(userId, account);
             account.setBalance(account.getBalance().add(tx.getAmount()));
             accountRepository.save(account);
             tx.reverse();
@@ -126,9 +127,10 @@ public class AccountTransactionService {
     }
 
     @Transactional
-    public void reverseIncome(String sourceType, Long sourceId) {
-        transactionRepository.findActiveSourceTransaction(sourceType, sourceId, AccountTransactionType.INCOME).ifPresent(tx -> {
+    public void reverseIncome(Long userId, String sourceType, Long sourceId) {
+        transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.INCOME).ifPresent(tx -> {
             Account account = getAccount(tx.getAccountId());
+            validateOwner(userId, account);
             account.setBalance(account.getBalance().subtract(tx.getAmount()));
             accountRepository.save(account);
             tx.reverse();
