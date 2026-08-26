@@ -4,6 +4,7 @@ import com.yuceloper.paytrack.auth.infrastructure.AuthService;
 import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.shared.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,6 +21,12 @@ public class AuthController {
     @PostMapping("/refresh")
     public ApiResponse<AuthDtos.SessionResponse> refresh(@RequestBody AuthDtos.RefreshRequest request) {
         return ApiResponse.success(authService.refresh(request.refreshToken()));
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@RequestBody AuthDtos.RefreshRequest request) {
+        authService.logout(AuthenticatedUser.id(), request.refreshToken());
     }
 
     @GetMapping("/me")
