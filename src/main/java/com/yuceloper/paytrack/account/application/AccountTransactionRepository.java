@@ -10,5 +10,5 @@ import java.util.Optional;
 public interface AccountTransactionRepository {
     AccountTransaction save(AccountTransaction transaction);
     List<AccountTransaction> findBetween(Long userId, LocalDate from, LocalDate to);
-    Optional<AccountTransaction> findActiveSourceTransaction(String sourceType, Long sourceId, AccountTransactionType type);
+    Optional<AccountTransaction> findActiveSourceTransaction(Long userId, String sourceType, Long sourceId, AccountTransactionType type);
 }
