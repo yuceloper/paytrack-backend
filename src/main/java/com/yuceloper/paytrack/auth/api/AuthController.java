@@ -22,6 +22,11 @@ public class AuthController {
         return ApiResponse.success(authService.refresh(request.refreshToken()));
     }
 
+    @GetMapping("/me")
+    public ApiResponse<AuthDtos.AccountProfileResponse> me() {
+        return ApiResponse.success(authService.getProfile(AuthenticatedUser.id()));
+    }
+
     @PostMapping("/google/link")
     public ApiResponse<AuthDtos.SessionResponse> linkGoogle(@RequestBody AuthDtos.GoogleLinkRequest request) {
         return ApiResponse.success(authService.linkGoogle(AuthenticatedUser.id(), request.idToken()));
