@@ -2,6 +2,7 @@ package com.yuceloper.paytrack.account.application;
 
 import com.yuceloper.paytrack.account.api.dto.AccountTransactionDtos;
 import com.yuceloper.paytrack.account.domain.Account;
+import com.yuceloper.paytrack.account.domain.AccountNature;
 import com.yuceloper.paytrack.account.domain.AccountTransaction;
 import com.yuceloper.paytrack.account.domain.AccountTransactionType;
 import com.yuceloper.paytrack.category.application.TransactionCategoryRepository;
@@ -39,8 +40,8 @@ public class AccountTransactionService {
         Account to = getAccount(request.toAccountId());
         validateOwnershipAndCurrency(userId, from, to);
 
-        from.setBalance(from.getBalance().subtract(request.amount()));
-        to.setBalance(to.getBalance().add(request.amount()));
+        applyExpense(from, request.amount());
+        applyIncome(to, request.amount());
         accountRepository.save(from);
         accountRepository.save(to);
 
@@ -66,9 +67,9 @@ public class AccountTransactionService {
         validateCategory(userId, request.categoryId(), request.type());
 
         if (request.type() == AccountTransactionType.EXPENSE) {
-            account.setBalance(account.getBalance().subtract(request.amount()));
+            applyExpense(account, request.amount());
         } else if (request.type() == AccountTransactionType.INCOME) {
-            account.setBalance(account.getBalance().add(request.amount()));
+            applyIncome(account, request.amount());
         } else {
             throw new IllegalArgumentException("Manual transaction type must be INCOME or EXPENSE");
         }
@@ -92,15 +93,20 @@ public class AccountTransactionService {
     public AccountTransactionDtos.Response adjustBalance(Long userId, AccountTransactionDtos.BalanceAdjustmentRequest request) {
         Account account = getAccount(request.accountId());
         validateOwner(userId, account);
+        validateTargetBalance(account, request.targetBalance());
 
         BigDecimal delta = request.targetBalance().subtract(account.getBalance());
         if (delta.signum() == 0) {
             throw new IllegalArgumentException("Target balance is already the current balance");
         }
 
-        AccountTransactionType type = delta.signum() > 0
-                ? AccountTransactionType.INCOME
-                : AccountTransactionType.EXPENSE;
+        AccountTransactionType type;
+        if (account.getNature() == AccountNature.LIABILITY) {
+            type = delta.signum() > 0 ? AccountTransactionType.EXPENSE : AccountTransactionType.INCOME;
+        } else {
+            type = delta.signum() > 0 ? AccountTransactionType.INCOME : AccountTransactionType.EXPENSE;
+        }
+
         BigDecimal amount = delta.abs();
         account.setBalance(request.targetBalance());
         accountRepository.save(account);
@@ -123,7 +129,7 @@ public class AccountTransactionService {
         if (transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.EXPENSE).isPresent()) return;
         Account account = getAccount(accountId);
         validateOwner(userId, account);
-        account.setBalance(account.getBalance().subtract(amount));
+        applyExpense(account, amount);
         accountRepository.save(account);
         transactionRepository.save(AccountTransaction.builder()
                 .userId(userId).type(AccountTransactionType.EXPENSE).accountId(accountId)
@@ -136,7 +142,7 @@ public class AccountTransactionService {
         if (transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.INCOME).isPresent()) return;
         Account account = getAccount(accountId);
         validateOwner(userId, account);
-        account.setBalance(account.getBalance().add(amount));
+        applyIncome(account, amount);
         accountRepository.save(account);
         transactionRepository.save(AccountTransaction.builder()
                 .userId(userId).type(AccountTransactionType.INCOME).accountId(accountId)
@@ -149,7 +155,7 @@ public class AccountTransactionService {
         transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.EXPENSE).ifPresent(tx -> {
             Account account = getAccount(tx.getAccountId());
             validateOwner(userId, account);
-            account.setBalance(account.getBalance().add(tx.getAmount()));
+            applyIncome(account, tx.getAmount());
             accountRepository.save(account);
             tx.reverse();
             transactionRepository.save(tx);
@@ -161,11 +167,38 @@ public class AccountTransactionService {
         transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.INCOME).ifPresent(tx -> {
             Account account = getAccount(tx.getAccountId());
             validateOwner(userId, account);
-            account.setBalance(account.getBalance().subtract(tx.getAmount()));
+            applyExpense(account, tx.getAmount());
             accountRepository.save(account);
             tx.reverse();
             transactionRepository.save(tx);
         });
+    }
+
+    private void applyExpense(Account account, BigDecimal amount) {
+        BigDecimal next = account.getNature() == AccountNature.LIABILITY
+                ? account.getBalance().add(amount)
+                : account.getBalance().subtract(amount);
+        validateTargetBalance(account, next);
+        account.setBalance(next);
+    }
+
+    private void applyIncome(Account account, BigDecimal amount) {
+        BigDecimal next = account.getNature() == AccountNature.LIABILITY
+                ? account.getBalance().subtract(amount)
+                : account.getBalance().add(amount);
+        validateTargetBalance(account, next);
+        account.setBalance(next);
+    }
+
+    private void validateTargetBalance(Account account, BigDecimal targetBalance) {
+        if (account.getNature() == AccountNature.LIABILITY) {
+            if (targetBalance.signum() < 0) {
+                throw new IllegalArgumentException("Liability payment cannot exceed outstanding debt");
+            }
+            if (account.getCreditLimit() != null && targetBalance.compareTo(account.getCreditLimit()) > 0) {
+                throw new IllegalArgumentException("Transaction would exceed the account credit limit");
+            }
+        }
     }
 
     private Account getAccount(Long id) {
