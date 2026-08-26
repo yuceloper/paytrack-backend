@@ -45,6 +45,20 @@ public class AuthService {
         return issueSession(user);
     }
 
+    @Transactional(readOnly = true)
+    public AuthDtos.AccountProfileResponse getProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .filter(User::isActive)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return new AuthDtos.AccountProfileResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getAuthProvider().name(),
+                user.getAuthProvider() == AuthProvider.GUEST
+        );
+    }
+
     @Transactional
     public AuthDtos.SessionResponse refresh(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
@@ -114,8 +128,6 @@ public class AuthService {
         Long guestId = guest.getId();
         Long targetId = target.getId();
 
-        // Categories have a (user_id, name) unique key. Reuse an existing target category
-        // before moving the rest so transaction references stay valid and no duplicate key occurs.
         jdbcTemplate.update("""
                 UPDATE account_transactions tx
                    SET category_id = target_category.id
@@ -146,7 +158,6 @@ public class AuthService {
         moveUserOwnedRows("income_occurrences", guestId, targetId);
         moveUserOwnedRows("account_transactions", guestId, targetId);
 
-        // Any token belonging to the temporary device user must stop working after the merge.
         jdbcTemplate.update("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?", guestId);
         guest.setActive(false);
         userRepository.save(guest);
