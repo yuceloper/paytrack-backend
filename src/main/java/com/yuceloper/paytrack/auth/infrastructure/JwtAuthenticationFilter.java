@@ -18,6 +18,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AuthUserJpaRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -30,8 +31,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             try {
                 Long userId = jwtService.parseUserId(token);
-                var authentication = new UsernamePasswordAuthenticationToken(userId, null, List.of());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                boolean activeUser = userRepository.findById(userId)
+                        .map(user -> user.isActive())
+                        .orElse(false);
+                if (activeUser) {
+                    var authentication = new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
             } catch (RuntimeException ignored) {
                 SecurityContextHolder.clearContext();
             }
