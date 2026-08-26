@@ -35,9 +35,17 @@ public class LoanService {
 
     @Transactional
     public LoanResponse create(Long userId, CreateLoanRequest request) {
-        if (request.remainingInstallments() > request.totalInstallments()) {
-            throw new IllegalArgumentException("remainingInstallments cannot exceed totalInstallments");
+        int paidInstallments = request.paidInstallments() == null ? 0 : request.paidInstallments();
+        if (paidInstallments > request.totalInstallments()) {
+            throw new IllegalArgumentException("paidInstallments cannot exceed totalInstallments");
         }
+
+        int remainingInstallments = request.totalInstallments() - paidInstallments;
+        LocalDate firstDueDate = firstPaymentDate(request.startDate(), request.paymentDay());
+        LocalDate endDate = paymentDate(
+                firstDueDate.plusMonths(request.totalInstallments() - 1L),
+                request.paymentDay()
+        );
 
         Loan loan = Loan.builder()
                 .userId(userId)
@@ -46,15 +54,15 @@ public class LoanService {
                 .installmentAmount(request.installmentAmount())
                 .paymentDay(request.paymentDay())
                 .totalInstallments(request.totalInstallments())
-                .remainingInstallments(request.remainingInstallments())
-                .remainingPrincipal(request.remainingPrincipal())
+                .remainingInstallments(remainingInstallments)
+                .remainingPrincipal(null)
                 .startDate(request.startDate())
-                .endDate(request.endDate())
-                .active(request.remainingInstallments() > 0)
+                .endDate(endDate)
+                .active(remainingInstallments > 0)
                 .build();
 
         Loan saved = repository.save(loan);
-        createRemainingInstallmentPayments(saved);
+        createRemainingInstallmentPayments(saved, firstDueDate, paidInstallments);
         return toResponse(saved);
     }
 
@@ -98,22 +106,21 @@ public class LoanService {
         return getEntity(userId, payment.getSourceId());
     }
 
-    private void createRemainingInstallmentPayments(Loan loan) {
+    private void createRemainingInstallmentPayments(
+            Loan loan,
+            LocalDate firstDueDate,
+            int paidInstallments
+    ) {
         int remaining = loan.getRemainingInstallments();
         if (remaining <= 0) return;
 
-        int alreadyPaid = loan.getTotalInstallments() - remaining;
-        LocalDate anchor = LocalDate.now();
-        if (loan.getStartDate() != null && loan.getStartDate().isAfter(anchor)) {
-            anchor = loan.getStartDate();
-        }
-
-        LocalDate firstDueDate = nextPaymentDate(anchor, loan.getPaymentDay());
         List<Payment> payments = new ArrayList<>(remaining);
-
         for (int i = 0; i < remaining; i++) {
-            int installmentNo = alreadyPaid + i + 1;
-            LocalDate dueDate = paymentDate(firstDueDate.plusMonths(i), loan.getPaymentDay());
+            int installmentNo = paidInstallments + i + 1;
+            LocalDate dueDate = paymentDate(
+                    firstDueDate.plusMonths(paidInstallments + i),
+                    loan.getPaymentDay()
+            );
             payments.add(Payment.builder()
                     .userId(loan.getUserId())
                     .name(loan.getName() + " taksit " + installmentNo + "/" + loan.getTotalInstallments())
@@ -133,10 +140,10 @@ public class LoanService {
         paymentRepository.saveAll(payments);
     }
 
-    private LocalDate nextPaymentDate(LocalDate anchor, int paymentDay) {
-        LocalDate candidate = paymentDate(anchor, paymentDay);
-        if (candidate.isBefore(anchor)) {
-            candidate = paymentDate(anchor.plusMonths(1), paymentDay);
+    private LocalDate firstPaymentDate(LocalDate startDate, int paymentDay) {
+        LocalDate candidate = paymentDate(startDate, paymentDay);
+        if (candidate.isBefore(startDate)) {
+            candidate = paymentDate(startDate.plusMonths(1), paymentDay);
         }
         return candidate;
     }
