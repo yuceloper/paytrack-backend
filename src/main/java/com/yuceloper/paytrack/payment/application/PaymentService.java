@@ -100,7 +100,7 @@ public class PaymentService {
     @Transactional
     public PaymentResponse markPending(Long userId, Long id) {
         Payment payment = getEntity(userId, id);
-        if (payment.isPaid()) accountTransactionService.reverseExpense("PAYMENT", payment.getId());
+        if (payment.isPaid()) accountTransactionService.reverseExpense(userId, "PAYMENT", payment.getId());
         payment.markPending();
         return toResponse(repository.save(payment));
     }
