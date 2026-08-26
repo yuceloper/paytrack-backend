@@ -1,5 +1,6 @@
 package com.yuceloper.paytrack.creditcard.api;
 
+import com.yuceloper.paytrack.auth.infrastructure.AuthenticatedUser;
 import com.yuceloper.paytrack.creditcard.api.dto.CreateCreditCardRequest;
 import com.yuceloper.paytrack.creditcard.api.dto.CreditCardResponse;
 import com.yuceloper.paytrack.creditcard.application.CreditCardService;
@@ -19,24 +20,24 @@ public class CreditCardController {
     private final CreditCardService service;
 
     @GetMapping
-    public ApiResponse<List<CreditCardResponse>> getAll(@RequestParam Long userId) {
-        return ApiResponse.success(service.getByUserId(userId));
+    public ApiResponse<List<CreditCardResponse>> getAll() {
+        return ApiResponse.success(service.getByUserId(AuthenticatedUser.id()));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<CreditCardResponse> getById(@PathVariable Long id) {
-        return ApiResponse.success(service.getById(id));
+        return ApiResponse.success(service.getById(AuthenticatedUser.id(), id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CreditCardResponse> create(@Valid @RequestBody CreateCreditCardRequest request) {
-        return ApiResponse.success(service.create(request));
+        return ApiResponse.success(service.create(AuthenticatedUser.id(), request));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
-        service.delete(id);
+        service.delete(AuthenticatedUser.id(), id);
     }
 }
