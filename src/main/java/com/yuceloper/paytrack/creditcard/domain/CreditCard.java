@@ -35,6 +35,9 @@ public class CreditCard {
     @Column(nullable = false)
     private Integer dueDay;
 
+    @Column(precision = 19, scale = 2)
+    private BigDecimal creditLimit;
+
     @Column(nullable = false, precision = 19, scale = 2)
     @Builder.Default
     private BigDecimal currentDebt = BigDecimal.ZERO;
