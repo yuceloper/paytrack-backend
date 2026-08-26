@@ -42,4 +42,12 @@ public class AccountTransactionController {
     ) {
         return ApiResponse.success(service.manual(AuthenticatedUser.id(), request));
     }
+
+    @PostMapping("/balance-adjustment")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<AccountTransactionDtos.Response> adjustBalance(
+            @Valid @RequestBody AccountTransactionDtos.BalanceAdjustmentRequest request
+    ) {
+        return ApiResponse.success(service.adjustBalance(AuthenticatedUser.id(), request));
+    }
 }
