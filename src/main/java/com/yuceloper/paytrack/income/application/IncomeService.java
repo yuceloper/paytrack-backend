@@ -130,16 +130,19 @@ public class IncomeService {
 
     @Transactional
     public IncomeResponses.Occurrence markReceived(Long userId, Long occurrenceId, Long accountId) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("accountId is required to mark income as received");
+        }
+
         IncomeOccurrence occurrence = getOccurrence(userId, occurrenceId);
         boolean wasReceived = occurrence.isReceived();
-        if (!wasReceived) occurrence.markReceived();
-        occurrenceRepository.save(occurrence);
-
-        if (!wasReceived && accountId != null) {
+        if (!wasReceived) {
             accountTransactionService.recordIncome(
                     accountId, userId, occurrence.getAmount(), occurrence.getName(),
                     "INCOME_OCCURRENCE", occurrence.getId(), LocalDate.now()
             );
+            occurrence.markReceived();
+            occurrenceRepository.save(occurrence);
         }
 
         IncomeSource source = getSource(userId, occurrence.getIncomeSourceId());
@@ -160,8 +163,10 @@ public class IncomeService {
     @Transactional
     public IncomeResponses.Occurrence markPending(Long userId, Long occurrenceId) {
         IncomeOccurrence occurrence = getOccurrence(userId, occurrenceId);
-        if (occurrence.isReceived()) accountTransactionService.reverseIncome("INCOME_OCCURRENCE", occurrence.getId());
-        occurrence.markPending();
+        if (occurrence.isReceived()) {
+            accountTransactionService.reverseIncome(userId, "INCOME_OCCURRENCE", occurrence.getId());
+            occurrence.markPending();
+        }
         return toOccurrence(occurrenceRepository.save(occurrence));
     }
 
