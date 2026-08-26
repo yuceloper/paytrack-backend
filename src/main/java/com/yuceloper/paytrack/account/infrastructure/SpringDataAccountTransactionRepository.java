@@ -13,7 +13,8 @@ import java.util.Optional;
 
 interface JpaAccountTransactionRepository extends JpaRepository<AccountTransaction, Long> {
     List<AccountTransaction> findAllByUserIdAndOccurredOnBetweenOrderByOccurredOnAscIdAsc(Long userId, LocalDate from, LocalDate to);
-    Optional<AccountTransaction> findFirstBySourceTypeAndSourceIdAndTypeAndReversedFalseOrderByIdDesc(
+    Optional<AccountTransaction> findFirstByUserIdAndSourceTypeAndSourceIdAndTypeAndReversedFalseOrderByIdDesc(
+            Long userId,
             String sourceType,
             Long sourceId,
             AccountTransactionType type
@@ -37,7 +38,9 @@ public class SpringDataAccountTransactionRepository implements AccountTransactio
     }
 
     @Override
-    public Optional<AccountTransaction> findActiveSourceTransaction(String sourceType, Long sourceId, AccountTransactionType type) {
-        return repository.findFirstBySourceTypeAndSourceIdAndTypeAndReversedFalseOrderByIdDesc(sourceType, sourceId, type);
+    public Optional<AccountTransaction> findActiveSourceTransaction(Long userId, String sourceType, Long sourceId, AccountTransactionType type) {
+        return repository.findFirstByUserIdAndSourceTypeAndSourceIdAndTypeAndReversedFalseOrderByIdDesc(
+                userId, sourceType, sourceId, type
+        );
     }
 }
