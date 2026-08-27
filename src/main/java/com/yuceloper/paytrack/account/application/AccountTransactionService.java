@@ -138,6 +138,18 @@ public class AccountTransactionService {
     }
 
     @Transactional
+    public void recordNonAnalyticOutflow(Long accountId, Long userId, BigDecimal amount, String description, String sourceType, Long sourceId, LocalDate date) {
+        Account account = getAccount(accountId);
+        validateOwner(userId, account);
+        applyExpense(account, amount);
+        accountRepository.save(account);
+        transactionRepository.save(AccountTransaction.builder()
+                .userId(userId).type(AccountTransactionType.EXPENSE).accountId(accountId)
+                .amount(amount).currency(account.getCurrency()).occurredOn(date != null ? date : LocalDate.now())
+                .description(description).sourceType(sourceType).sourceId(sourceId).build());
+    }
+
+    @Transactional
     public void recordIncome(Long accountId, Long userId, BigDecimal amount, String description, String sourceType, Long sourceId, LocalDate date) {
         if (transactionRepository.findActiveSourceTransaction(userId, sourceType, sourceId, AccountTransactionType.INCOME).isPresent()) return;
         Account account = getAccount(accountId);
