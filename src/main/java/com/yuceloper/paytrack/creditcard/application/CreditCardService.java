@@ -1,6 +1,8 @@
 package com.yuceloper.paytrack.creditcard.application;
 
+import com.yuceloper.paytrack.account.application.AccountTransactionService;
 import com.yuceloper.paytrack.creditcard.api.dto.CreateCreditCardRequest;
+import com.yuceloper.paytrack.creditcard.api.dto.CreditCardPaymentRequest;
 import com.yuceloper.paytrack.creditcard.api.dto.CreditCardResponse;
 import com.yuceloper.paytrack.creditcard.domain.CreditCard;
 import com.yuceloper.paytrack.shared.exception.ResourceNotFoundException;
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -17,6 +20,7 @@ import java.util.List;
 public class CreditCardService {
 
     private final CreditCardRepository repository;
+    private final AccountTransactionService accountTransactionService;
 
     public List<CreditCardResponse> getByUserId(Long userId) {
         return repository.findAllByUserId(userId).stream()
@@ -53,8 +57,42 @@ public class CreditCardService {
     }
 
     @Transactional
+    public CreditCardResponse pay(Long userId, Long id, CreditCardPaymentRequest request) {
+        CreditCard card = getEntity(userId, id);
+        BigDecimal debt = defaultMoney(card.getCurrentDebt());
+        if (debt.signum() <= 0) {
+            throw new IllegalArgumentException("Credit card has no outstanding debt");
+        }
+        if (request.amount().compareTo(debt) > 0) {
+            throw new IllegalArgumentException("Payment amount cannot exceed current debt");
+        }
+
+        accountTransactionService.recordNonAnalyticOutflow(
+                request.accountId(),
+                userId,
+                request.amount(),
+                card.getName() + " kredi kartı ödemesi",
+                "CREDIT_CARD_PAYMENT",
+                card.getId(),
+                request.occurredOn() != null ? request.occurredOn() : LocalDate.now()
+        );
+
+        BigDecimal remainingDebt = debt.subtract(request.amount());
+        card.setCurrentDebt(remainingDebt);
+        if (remainingDebt.signum() == 0) {
+            card.setMinimumPayment(BigDecimal.ZERO);
+        } else if (card.getMinimumPayment() != null && card.getMinimumPayment().compareTo(remainingDebt) > 0) {
+            card.setMinimumPayment(remainingDebt);
+        }
+        return toResponse(repository.save(card));
+    }
+
+    @Transactional
     public void delete(Long userId, Long id) {
-        getEntity(userId, id);
+        CreditCard card = getEntity(userId, id);
+        if (defaultMoney(card.getCurrentDebt()).signum() > 0) {
+            throw new IllegalArgumentException("A credit card with outstanding debt cannot be deleted");
+        }
         repository.deleteById(id);
     }
 
