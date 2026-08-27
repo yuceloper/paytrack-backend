@@ -18,6 +18,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,10 @@ import java.util.Map;
 public class MonthlyAnalyticsService {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+    private static final Set<String> NON_SPENDING_SOURCE_TYPES = Set.of(
+            "BALANCE_ADJUSTMENT",
+            "CREDIT_CARD_PAYMENT"
+    );
 
     private final AccountTransactionRepository transactionRepository;
     private final TransactionCategoryRepository categoryRepository;
@@ -105,6 +110,8 @@ public class MonthlyAnalyticsService {
         return transactionRepository.findBetween(userId, from, to).stream()
                 .filter(transaction -> !transaction.isReversed())
                 .filter(transaction -> transaction.getType() != AccountTransactionType.TRANSFER)
+                .filter(transaction -> transaction.getSourceType() == null
+                        || !NON_SPENDING_SOURCE_TYPES.contains(transaction.getSourceType()))
                 .toList();
     }
 
