@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: paytrack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-paytrack}
+      POSTGRES_USER: ${POSTGRES_USER:-paytrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - paytrack_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paytrack} -d ${POSTGRES_DB:-paytrack}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - paytrack_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paytrack-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-paytrack}
+      DB_USERNAME: ${POSTGRES_USER:-paytrack}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-60}
+      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-180}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      PORT: 8080
+    expose:
+      - "8080"
+    networks:
+      - paytrack_internal
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: paytrack-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - paytrack_internal
+
+volumes:
+  paytrack_postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  paytrack_internal:
+    driver: bridge
