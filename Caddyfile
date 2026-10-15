@@ -1,13 +1,25 @@
 {$API_DOMAIN} {
   encode zstd gzip
 
-  reverse_proxy backend:8080
-
   header {
     -Server
     X-Content-Type-Options "nosniff"
     X-Frame-Options "DENY"
     Referrer-Policy "no-referrer"
+  }
+
+  handle_path /privacy* {
+    root * /srv/site/privacy
+    file_server
+  }
+
+  handle_path /support* {
+    root * /srv/site/support
+    file_server
+  }
+
+  handle {
+    reverse_proxy backend:8080
   }
 
   log {
