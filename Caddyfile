@@ -18,6 +18,11 @@
     file_server
   }
 
+  handle_path /delete-account* {
+    root * /srv/site/delete-account
+    file_server
+  }
+
   handle {
     reverse_proxy backend:8080
   }
