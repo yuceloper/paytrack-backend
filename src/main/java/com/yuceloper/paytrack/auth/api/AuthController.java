@@ -34,6 +34,12 @@ public class AuthController {
         return ApiResponse.success(authService.getProfile(AuthenticatedUser.id()));
     }
 
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAccount() {
+        authService.deleteAccount(AuthenticatedUser.id());
+    }
+
     @PostMapping("/google/link")
     public ApiResponse<AuthDtos.SessionResponse> linkGoogle(@RequestBody AuthDtos.GoogleLinkRequest request) {
         return ApiResponse.success(authService.linkGoogle(AuthenticatedUser.id(), request.idToken()));
