@@ -95,6 +95,28 @@ public class AuthService {
     }
 
     @Transactional
+    public void deleteAccount(Long currentUserId) {
+        User user = userRepository.findById(currentUserId)
+                .filter(User::isActive)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        deleteUserOwnedRows("account_transactions", currentUserId);
+        deleteUserOwnedRows("income_occurrences", currentUserId);
+        deleteUserOwnedRows("payments", currentUserId);
+        deleteUserOwnedRows("income_sources", currentUserId);
+        deleteUserOwnedRows("transaction_categories", currentUserId);
+        deleteUserOwnedRows("credit_cards", currentUserId);
+        deleteUserOwnedRows("loans", currentUserId);
+        deleteUserOwnedRows("subscriptions", currentUserId);
+        deleteUserOwnedRows("bills", currentUserId);
+        deleteUserOwnedRows("accounts", currentUserId);
+        deleteUserOwnedRows("refresh_tokens", currentUserId);
+
+        userRepository.delete(user);
+        userRepository.flush();
+    }
+
+    @Transactional
     public AuthDtos.SessionResponse linkGoogle(Long currentUserId, String idToken) {
         User current = userRepository.findById(currentUserId)
                 .filter(User::isActive)
@@ -179,6 +201,10 @@ public class AuthService {
 
     private void moveUserOwnedRows(String tableName, Long fromUserId, Long toUserId) {
         jdbcTemplate.update("UPDATE " + tableName + " SET user_id = ? WHERE user_id = ?", toUserId, fromUserId);
+    }
+
+    private void deleteUserOwnedRows(String tableName, Long userId) {
+        jdbcTemplate.update("DELETE FROM " + tableName + " WHERE user_id = ?", userId);
     }
 
     private AuthDtos.SessionResponse issueSession(User user) {
